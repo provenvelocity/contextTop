@@ -1,0 +1,25 @@
+{
+  "name": "contexttop-vscode",
+  "displayName": "contextTop",
+  "description": "Live GitHub Copilot context observability and fixes.",
+  "version": "0.1.0",
+  "publisher": "provenvelocity",
+  "engines": { "vscode": "^1.96.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onView:contextTop.fix", "onCommand:contextTop.openFix"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [{ "command": "contextTop.openFix", "title": "contextTop: Open Fix" }],
+    "viewsContainers": { "panel": [{ "id": "contextTop", "title": "contextTop", "icon": "media/contexttop.svg" }] },
+    "views": { "contextTop": [{ "id": "contextTop.fix", "name": "ContextTop Fix" }] },
+    "configuration": {
+      "title": "contextTop",
+      "properties": {
+        "contextTop.warningThreshold": { "type": "number", "default": 0.7, "minimum": 0.1, "maximum": 1, "description": "Estimated context pressure at which ContextTop Fix surfaces a warning." },
+        "contextTop.captureLevel": { "type": "string", "enum": ["metadata", "redacted-detail"], "default": "metadata", "description": "Amount of context detail stored locally." }
+      }
+    }
+  },
+  "scripts": { "compile": "tsc -p ./", "watch": "tsc -watch -p ./" },
+  "devDependencies": { "@types/node": "^22.0.0", "@types/vscode": "^1.96.0", "typescript": "^5.7.0" }
+}
