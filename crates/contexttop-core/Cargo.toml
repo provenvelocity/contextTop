@@ -6,3 +6,15 @@ license.workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "engine"
+path = "src/bin/engine.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+getrandom = { workspace = true }
+ulid = { workspace = true }

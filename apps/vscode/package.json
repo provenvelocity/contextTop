@@ -9,14 +9,34 @@
   "activationEvents": ["onView:contextTop.fix", "onCommand:contextTop.openFix"],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [{ "command": "contextTop.openFix", "title": "contextTop: Open Fix" }],
+    "commands": [
+      { "command": "contextTop.openFix", "title": "contextTop: Open Fix" },
+      { "command": "contextTop.enableDiagnostics", "title": "contextTop: Enable Diagnostic Log Ingestion" },
+      { "command": "contextTop.enableAgentDebugLog", "title": "contextTop: Enable Copilot Agent Debug Log (OTLP)" }
+    ],
     "viewsContainers": { "panel": [{ "id": "contextTop", "title": "contextTop", "icon": "media/contexttop.svg" }] },
-    "views": { "contextTop": [{ "id": "contextTop.fix", "name": "ContextTop Fix" }] },
+    "views": { "contextTop": [{ "id": "contextTop.fix", "name": "ContextTop Fix", "type": "webview" }] },
     "configuration": {
       "title": "contextTop",
       "properties": {
-        "contextTop.warningThreshold": { "type": "number", "default": 0.7, "minimum": 0.1, "maximum": 1, "description": "Estimated context pressure at which ContextTop Fix surfaces a warning." },
-        "contextTop.captureLevel": { "type": "string", "enum": ["metadata", "redacted-detail"], "default": "metadata", "description": "Amount of context detail stored locally." }
+        "contextTop.warningThreshold": { "type": "number", "default": 0.7, "minimum": 0.1, "maximum": 1, "description": "Estimated context pressure (fraction of observed budget) at which ContextTop Fix surfaces a warning." },
+        "contextTop.warnTokens": { "type": "number", "default": 40000, "minimum": 0, "description": "Absolute candidate-token level at which the live chart turns amber (warning zone)." },
+        "contextTop.criticalTokens": { "type": "number", "default": 80000, "minimum": 0, "description": "Absolute candidate-token level at which the live chart turns red (critical zone)." },
+        "contextTop.timeWindowMinutes": { "type": "number", "default": 5, "enum": [1, 5, 15, 30, 60], "description": "Time span shown on the live chart, in minutes. Also settable from the panel." },
+        "contextTop.captureLevel": { "type": "string", "enum": ["off", "metadata", "redacted-detail"], "default": "metadata", "description": "What may be stored locally: nothing, metrics only, or metrics plus short-lived redacted detail." },
+        "contextTop.allowTransientContentProcessing": { "type": "boolean", "default": true, "description": "Allow bounded raw source content into the local engine for tokenization and redaction. Disabling forces coarser size-based estimates. Never enables persistence." },
+        "contextTop.enableDiagnosticLogs": { "type": "boolean", "default": false, "description": "Opt in to parsing validated GitHub Copilot trace logs for request lifecycle, selected model, and context breakdown." },
+        "contextTop.detailRetentionHours": { "type": "number", "default": 24, "minimum": 0, "maximum": 168, "description": "Hours to retain optional redacted-detail records before automatic deletion (max 7 days)." },
+        "contextTop.measurementRetentionDays": { "type": "number", "default": 7, "minimum": 1, "maximum": 30, "description": "Days to retain source measurements and request snapshots." },
+        "contextTop.rollupRetentionDays": { "type": "number", "default": 30, "minimum": 1, "maximum": 90, "description": "Days to retain hourly aggregate rollups." },
+        "contextTop.maxStorageMiB": { "type": "number", "default": 100, "minimum": 16, "maximum": 1024, "description": "Hard cap on local contextTop storage before oldest data is evicted." },
+        "contextTop.dashboardLayout": {
+          "type": "array",
+          "default": ["request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"],
+          "items": { "type": "string", "enum": ["request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"] },
+          "uniqueItems": true,
+          "markdownDescription": "Which dashboard cards to show and in what order. Cards omitted from the list are hidden. Available cards: `request`, `requestBreakdown`, `gauges`, `chart`, `sources`, `analytics`, `actions`."
+        }
       }
     }
   },

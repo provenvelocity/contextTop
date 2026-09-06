@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>contextTop — Copilot context tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <a class="brand" href="#"><span class="brand-mark">C</span><span>context<span>Top</span></span></a>
+        <p class="workspace-label">WORKSPACE</p>
+        <button class="workspace"><span class="workspace-dot"></span><span>atlas-web</span><span class="chevron">⌄</span></button>
+        <nav aria-label="Primary navigation">
+          <button class="nav-item active" data-view="overview"><span>◈</span> Overview</button>
+          <button class="nav-item" data-view="sessions"><span>◴</span> Sessions <b id="session-count">6</b></button>
+          <button class="nav-item" title="Source explorer is coming next"><span>⌘</span> Sources</button>
+          <button class="nav-item" title="Insights are coming next"><span>✦</span> Insights</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="nav-item"><span>⚙</span> Settings</button>
+          <div class="profile"><div class="avatar">JS</div><div><strong>Joshua S.</strong><small>Personal workspace</small></div><span>···</span></div>
+        </div>
+      </aside>
+
+      <main>
+        <header>
+          <div><p class="eyebrow" id="date-label"></p><h1 id="page-title">Your context, at a glance.</h1></div>
+          <div class="header-actions"><button class="icon-button" aria-label="Notifications">♧</button><button class="new-session" id="open-modal">+ New session</button></div>
+        </header>
+
+        <section id="overview-view" class="view">
+          <div class="notice"><span class="notice-icon">✦</span><p><strong>contextTop is watching your workspace.</strong> Add a session after a meaningful Copilot chat to build a clear history of what helped.</p><button id="dismiss-notice">×</button></div>
+          <section class="metrics" aria-label="Context metrics">
+            <article><p>CONTEXT CAPTURED</p><strong id="context-total">48.2k</strong><span>tokens this week <i>↑ 18%</i></span><div class="sparkline teal"></div></article>
+            <article><p>COPILOT SESSIONS</p><strong id="sessions-total">6</strong><span>across 3 projects <i>↑ 2</i></span><div class="sparkline purple"></div></article>
+            <article><p>CONTEXT REUSED</p><strong>67%</strong><span>of sources referenced <i>↑ 9%</i></span><div class="sparkline gold"></div></article>
+            <article><p>FOCUS TIME</p><strong>4h 18m</strong><span>with Copilot this week <i>↑ 42m</i></span><div class="sparkline pink"></div></article>
+          </section>
+
+          <section class="grid">
+            <article class="panel activity-panel"><div class="panel-heading"><div><p class="eyebrow">THIS WEEK</p><h2>Context activity</h2></div><button class="text-button">Last 7 days⌄</button></div><div class="chart"><div class="chart-y"><span>16k</span><span>12k</span><span>8k</span><span>4k</span><span>0</span></div><div class="bars"><div><i style="height:35%"></i><b>Mon</b></div><div><i style="height:54%"></i><b>Tue</b></div><div><i style="height:42%"></i><b>Wed</b></div><div><i style="height:76%"></i><b>Thu</b></div><div class="today"><i style="height:92%"></i><b>Fri</b></div><div><i style="height:14%"></i><b>Sat</b></div><div><i style="height:9%"></i><b>Sun</b></div></div></div><div class="chart-legend"><span><i class="legend-dot"></i> Context tokens</span><strong>48,242 total</strong></div></article>
+            <article class="panel composition"><div class="panel-heading"><div><p class="eyebrow">BY TYPE</p><h2>Context composition</h2></div><button class="text-button">View all</button></div><div class="donut-wrap"><div class="donut"><div>48.2<small>k tokens</small></div></div><ul><li><i class="dot teal-dot"></i><span>Code & files</span><b>41%</b></li><li><i class="dot purple-dot"></i><span>Chat prompts</span><b>28%</b></li><li><i class="dot yellow-dot"></i><span>Terminal output</span><b>19%</b></li><li><i class="dot pink-dot"></i><span>Documentation</span><b>12%</b></li></ul></div></article>
+          </section>
+
+          <section class="recent-section"><div class="section-heading"><div><p class="eyebrow">RECENT</p><h2>Copilot sessions</h2></div><button class="text-button" id="view-sessions">View all sessions →</button></div><div class="session-list" id="session-list"></div></section>
+        </section>
+
+        <section id="sessions-view" class="view hidden"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>All Copilot sessions</h2></div><button class="text-button" id="back-overview">← Overview</button></div><div class="filter-row"><button class="filter selected">All</button><button class="filter">Today</button><button class="filter">This week</button><input id="session-search" placeholder="Search sessions" /></div><div class="session-list full" id="all-session-list"></div></section>
+      </main>
+    </div>
+
+    <dialog id="session-modal"><form method="dialog" id="session-form"><div class="modal-header"><div><p class="eyebrow">CAPTURE CONTEXT</p><h2>New Copilot session</h2></div><button value="cancel" class="close">×</button></div><label>What were you working on?<input required name="title" placeholder="e.g. Refactor the auth flow" /></label><div class="split"><label>Project<input name="project" value="atlas-web" /></label><label>Context type<select name="type"><option>Code & files</option><option>Chat prompts</option><option>Terminal output</option><option>Documentation</option></select></label></div><label>Useful context or takeaway<textarea name="note" placeholder="What context made Copilot more effective?"></textarea></label><label>Approx. tokens<input name="tokens" type="number" min="0" value="3200" /></label><div class="modal-actions"><button value="cancel" class="secondary">Cancel</button><button value="default" class="new-session">Save session</button></div></form></dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
