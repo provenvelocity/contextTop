@@ -189,7 +189,8 @@ The bespoke canvas has been made data-driven:
 ## 5. The story: prune tools you don't use
 
 The measurement exists to drive an action. The **Story card** turns the numbers into a
-plain-English narrative and a lever:
+plain-English narrative and a lever. See [`TOOL_STORY.md`](TOOL_STORY.md) for the full,
+cross-referenced write-up; in brief:
 
 - Joins per-tool schema cost (`vscode.lm.tools`, tokenized) with the tools Copilot
   **actually invoked** this session (`tool_call` span names).

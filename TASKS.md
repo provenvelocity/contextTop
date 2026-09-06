@@ -6,6 +6,7 @@
 
 ## Completed
 
+- [x] 2026-09-06 — **Write up the tool story (cross-referenced)** — Add `docs/TOOL_STORY.md` documenting the tool-efficiency story + per-call toggling feasibility, cross-referenced to SIGNALS/METRICS/PRODUCT/IPC/ARCHITECTURE/DASHBOARD, confirming consistency with the frozen `unselect_tools` guided-fix contract and flagging the open item (migrate adapter-side Story to an engine `getRecommendations` item).
 - [x] 2026-09-06 — **Tool-efficiency story card + prune action** — Add a Story card that narrates tool context cost: joins per-tool schema cost (`vscode.lm.tools`) with tools Copilot actually invoked (`tool_call` spans), headlines total tool tokens + % of last request, lists biggest unused tools with token savings, and a "Manage tools…" action that opens VS Code tool config or guides to the Chat Tools picker. Documented per-call AI-toggling feasibility (recommend-only; no API to disable tools programmatically). New `story` card in layout + `contextTop.manageTools` command.
 
 - [x] 2026-09-06 — **Chart metric selector + all-metrics overlay** — Add a Request-mode dropdown to plot All metrics (default, each normalized to its own max), Composition, or a single per-request metric in real units (input / budget % / cache hit % / uncached / context growth / TTFT / latency / output / billing). Chart legend shows live per-metric values; picking a metric switches to Request mode.
