@@ -373,6 +373,32 @@ function ingest(engine: EngineClient, payload: Record<string, unknown>): void {
   });
 }
 
+/** Last sent signature + time per sourceIdentity, to suppress redundant re-ingests. */
+const lastIngest = new Map<string, { sig: string; ts: number }>();
+/** Re-send an unchanged observation at most this often (keeps it under the engine TTL). */
+const INGEST_REFRESH_MS = 30_000;
+
+/**
+ * Ingest only when the observation changed, or its last send is stale. Rescans (e.g. tools
+ * every 5s) otherwise resend dozens of identical observations, flooding the engine pipe.
+ * Observations carrying raw `transientContent` always send so content is processed.
+ */
+function ingestDeduped(engine: EngineClient, payload: Record<string, unknown>): void {
+  const identity = String(payload.sourceIdentity ?? '');
+  if (!identity || payload.transientContent !== undefined) {
+    ingest(engine, payload);
+    return;
+  }
+  const sig = JSON.stringify([payload.sourceKind, payload.observed, payload.coverage, payload.provenance]);
+  const prev = lastIngest.get(identity);
+  const now = Date.now();
+  if (prev && prev.sig === sig && now - prev.ts < INGEST_REFRESH_MS) {
+    return;
+  }
+  lastIngest.set(identity, { sig, ts: now });
+  ingest(engine, payload);
+}
+
 /**
  * Set up all ambient collectors. Each observation is a candidate — never confirmed
  * request context. Sources: selection, open files, instruction/prompt files, and
@@ -425,7 +451,7 @@ function setupAmbientCollectors(
     ambientInventory.editorsCount = docs.length;
     for (const doc of docs) {
       const byteLen = Buffer.byteLength(doc.getText(), 'utf8');
-      ingest(engine, {
+      ingestDeduped(engine, {
         sourceIdentity: `file:${doc.uri.toString()}`,
         sourceKind: 'files',
         observed: { byteLen },
@@ -462,7 +488,7 @@ function setupAmbientCollectors(
         try {
           const stat = await vscode.workspace.fs.stat(uri);
           detail.push({ name: uri.path.split('/').pop() || uri.path, tokens: estTokens(stat.size) });
-          ingest(engine, {
+          ingestDeduped(engine, {
             sourceIdentity: `instructions:${uri.toString()}`,
             sourceKind: 'instructions',
             observed: { byteLen: stat.size },
@@ -493,7 +519,7 @@ function setupAmbientCollectors(
       const toolTokens = estTokens(bytes);
       totalTokens += toolTokens;
       detail.push({ name: tool.name, tokens: toolTokens });
-      ingest(engine, {
+      ingestDeduped(engine, {
         sourceIdentity: `tool:${tool.name}`,
         sourceKind: 'tools',
         observed: { byteLen: bytes },

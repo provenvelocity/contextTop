@@ -27,6 +27,9 @@ export class EngineClient {
   private maxRestarts = 1;
   private isShuttingDown = false;
   private output: vscode.OutputChannel;
+  /** Consecutive request timeouts; a run of them means the engine has gone silent. */
+  private consecutiveTimeouts = 0;
+  private recovering = false;
 
   constructor(private readonly extensionPath: string) {
     this.sessionId = randomBytes(8).toString('hex').toUpperCase();
@@ -87,7 +90,8 @@ export class EngineClient {
     // Attach process exit handler.
     this.child.on('exit', (code) => {
       this.output.appendLine(`[${new Date().toISOString()}] Engine exited with code ${code}`);
-      if (!this.isShuttingDown && this.restartCount < this.maxRestarts) {
+      // `_recover` drives its own respawn; don't double-restart here.
+      if (!this.isShuttingDown && !this.recovering && this.restartCount < this.maxRestarts) {
         this.restartCount++;
         this.output.appendLine(`[${new Date().toISOString()}] Restarting engine (attempt ${this.restartCount}/${this.maxRestarts})`);
         this._start().catch(err => {
@@ -152,6 +156,12 @@ export class EngineClient {
       const timeout = setTimeout(
         () => {
           this.pending.delete(envelope.id!);
+          this.consecutiveTimeouts++;
+          // A sustained run of timeouts means the engine went silent (e.g. a stalled
+          // pipe). Restart it rather than staying dark forever.
+          if (this.consecutiveTimeouts >= 8) {
+            this._recover();
+          }
           reject(new Error(`Request ${envelope.id} timed out`));
         },
         5000
@@ -184,6 +194,31 @@ export class EngineClient {
     const list = this.eventHandlers.get(type) ?? [];
     list.push(handler);
     this.eventHandlers.set(type, list);
+  }
+
+  /** Restart a silent engine: drop in-flight requests, respawn, and re-handshake. */
+  private _recover(): void {
+    if (this.recovering || this.isShuttingDown) {
+      return;
+    }
+    this.recovering = true;
+    this.consecutiveTimeouts = 0;
+    this.output.appendLine(`[${new Date().toISOString()}] Engine unresponsive; restarting`);
+    this.pending.clear();
+    const old = this.child;
+    this.child = undefined;
+    try {
+      old?.kill('SIGKILL');
+    } catch {
+      /* already gone */
+    }
+    // Allow a fresh supervised restart even if the prior restart budget was spent.
+    this.restartCount = 0;
+    this._start()
+      .catch((err) => this.output.appendLine(`[ERROR] Engine recovery failed: ${err.message}`))
+      .finally(() => {
+        this.recovering = false;
+      });
   }
 
   /** Gracefully shut down the engine. */
@@ -245,6 +280,7 @@ export class EngineClient {
     if (envelope.id && this.pending.has(envelope.id)) {
       const handler = this.pending.get(envelope.id)!;
       this.pending.delete(envelope.id);
+      this.consecutiveTimeouts = 0; // the engine is answering again
       handler(envelope);
       return;
     }
