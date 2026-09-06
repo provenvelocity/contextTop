@@ -2,9 +2,14 @@
 
 ## In Progress
 
-- [ ] 2026-09-05 — **Audit & prune unneeded VS Code extensions** — Evaluate installed extensions against this Rust + TypeScript + Markdown repo; disable-for-now via `.vscode/extensions.json` (recommendations + unwantedRecommendations); build a removal list. Global uninstall pending user confirmation.
+- [ ] 2026-09-06 — **Emit `fix_verified`** — Engine-owned verification of an applied fix against the first post-apply request snapshot, per the comparison rules in `docs/PRODUCT.md#contexttop-fix` (same `model_id`, unchanged `unknown_source_count`, delta limited to frozen `targetSourceKeys`). `reportLifecycle` handles proposed/accepted/applied today; verified is the remaining piece.
+- [ ] 2026-09-06 — **Close the diagnostics validation gate** — Complete the checklist in `docs/SIGNALS.md#diagnostics-validation-gate` (OTLP schema validated + field-allowlisted per platform, raw trace fallback pinned, cross-platform probe on 5+ requests, per-signal coverage, VS Code/Copilot version matrix, no-raw-content tests) before diagnostics are on by default. A first-cut opt-in tailer already ships; this formalizes it.
+- [ ] 2026-09-05 — **Global uninstall of unneeded VS Code extensions** — `.vscode/extensions.json` recommendations + unwantedRecommendations are in place (non-destructive, reversible). Global uninstall remains pending explicit user confirmation.
 
 ## Completed
+
+- [x] 2026-09-06 — **Fix lifecycle: `request.reportLifecycle` (proposed/accepted/applied)** — Add the `ReportLifecycleRequest`/`LifecycleResponse` protocol types and an engine handler that registers `fix_proposed` on first ranking, validates adapter `fix_accepted`/`fix_applied` transitions (correct order; `removedSourceKeys` only on apply and within frozen `targetSourceKeys`; engine-owned kinds rejected; tool events require `operationId`), and acks with the new fix state. Adapter reports `fix_accepted` when the user acts on the Story card's *Manage tools…*. 6 new engine tests; `fix_verified` scoped as the remaining piece. Consistent with `docs/IPC.md#requestreportlifecycle`.
+- [x] 2026-09-06 — **Extension recommendations file** — `.vscode/extensions.json` lists the stack's recommended extensions and steers VS Code to disable unrelated stacks for this workspace (reversible; nothing uninstalled).
 
 - [x] 2026-09-06 — **First wrap-up: CI + testing docs + clean baseline** — Add `.github/workflows/ci.yml` (Rust fmt/clippy `-D warnings`/test/build engine artifact, extension `npm ci`+compile, docs check), `scripts/check-docs.py` (broken-link + trailing-whitespace gate), and `docs/TESTING.md` (build/run-F5/try/CI-parity). Normalize Rust formatting and fix the `collapsible_if` clippy lint so the baseline is fmt- and clippy-clean. README gains build/run/test + repo-map links. Tag `v0.1.0` as the wrap-up point.
 

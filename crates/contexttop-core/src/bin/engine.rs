@@ -15,10 +15,11 @@ use contexttop_core::model::{
 };
 use contexttop_core::protocol::{
     Envelope, ErrorCode, ErrorPayload, GetRecommendationsRequest, GetTimelineRequest,
-    IngestObservationRequest, IngestObservationResponse, MAX_MESSAGE_BYTES, MetricBucketView,
-    PROTOCOL_VERSION, RecommendationItem, RecommendationsResponse, RecordRequestSnapshotRequest,
-    RecordRequestSnapshotResponse, Rejection, SetConfigRequest, SetConfigResponse,
-    SubscribeMetricsRequest, SubscribeMetricsResponse, TimelineResponse, accept_hello,
+    IngestObservationRequest, IngestObservationResponse, LifecycleResponse, MAX_MESSAGE_BYTES,
+    MetricBucketView, PROTOCOL_VERSION, RecommendationItem, RecommendationsResponse,
+    RecordRequestSnapshotRequest, RecordRequestSnapshotResponse, Rejection, ReportLifecycleRequest,
+    SetConfigRequest, SetConfigResponse, SubscribeMetricsRequest, SubscribeMetricsResponse,
+    TimelineResponse, accept_hello,
 };
 use contexttop_core::recommend::{RankInput, rank};
 use contexttop_core::redaction::Redactor;
@@ -34,6 +35,33 @@ const MIN_FIX_TOKENS: u64 = 1_000;
 /// How long (ms) to retain candidate measurements before tombstoning them.
 const CANDIDATE_TTL_MS: u64 = 60 * 60 * 1000; // 1 hour
 
+/// Lifecycle state of a proposed fix. The engine owns `Proposed`; the adapter drives
+/// `Accepted` and `Applied` via `request.reportLifecycle`. `fix_verified` is engine-owned
+/// and rejected from the adapter; it is not yet emitted (needs snapshot comparison rules).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FixState {
+    Proposed,
+    Accepted,
+    Applied,
+}
+
+impl FixState {
+    fn as_wire(self) -> &'static str {
+        match self {
+            Self::Proposed => "fix_proposed",
+            Self::Accepted => "fix_accepted",
+            Self::Applied => "fix_applied",
+        }
+    }
+}
+
+/// A proposed fix with its frozen scope, tracked so lifecycle transitions can be validated.
+#[derive(Debug, Clone)]
+struct FixRecord {
+    state: FixState,
+    target_source_keys: Vec<String>,
+}
+
 /// Per-session engine state established after the handshake.
 struct EngineState {
     session_id: String,
@@ -43,6 +71,7 @@ struct EngineState {
     redactor: Redactor,
     snapshots: BTreeMap<String, RequestSnapshot>,
     fix_ids: BTreeMap<String, String>,
+    fix_states: BTreeMap<String, FixRecord>,
     policy_revision: u64,
     effective_config: Value,
     next_seq: u64,
@@ -64,6 +93,7 @@ impl EngineState {
             redactor: Redactor::default(),
             snapshots: BTreeMap::new(),
             fix_ids: BTreeMap::new(),
+            fix_states: BTreeMap::new(),
             policy_revision: 1,
             effective_config: Value::Null,
             next_seq: 1,
@@ -278,6 +308,13 @@ impl EngineState {
                     .entry(tuple)
                     .or_insert_with(|| Ulid::new().to_string())
                     .clone();
+                // First sighting of a fixId is its `fix_proposed`; register its frozen scope.
+                self.fix_states
+                    .entry(fix_id.clone())
+                    .or_insert_with(|| FixRecord {
+                        state: FixState::Proposed,
+                        target_source_keys: rec.target_source_keys.clone(),
+                    });
                 RecommendationItem {
                     fix_id,
                     basis_request_id: basis_request_id.clone(),
@@ -297,6 +334,93 @@ impl EngineState {
             })
             .collect();
         Ok(RecommendationsResponse { items })
+    }
+
+    /// Record an adapter-reported lifecycle event. Request markers update the projection;
+    /// fix transitions (`fix_accepted`, `fix_applied`) advance the frozen fix's state with
+    /// scope validation. Engine-owned kinds are rejected. Ranking/verification stay engine-owned.
+    fn record_lifecycle(
+        &mut self,
+        req: &ReportLifecycleRequest,
+    ) -> Result<LifecycleResponse, Rejection> {
+        match req.kind.as_str() {
+            // Engine-owned markers must never be forged by the adapter.
+            "request_sent" | "fix_proposed" | "fix_verified" => Err(Rejection::new(
+                ErrorCode::Protocol,
+                format!("lifecycle kind '{}' is engine-owned", req.kind),
+            )),
+            "fix_accepted" | "fix_applied" => {
+                let fix_id = req.fix_id.as_ref().ok_or_else(|| {
+                    Rejection::new(
+                        ErrorCode::BadRequest,
+                        "fix transition requires fixId".to_owned(),
+                    )
+                })?;
+                let record = self.fix_states.get(fix_id).ok_or_else(|| {
+                    Rejection::new(ErrorCode::BadRequest, format!("unknown fixId '{fix_id}'"))
+                })?;
+                let is_apply = req.kind == "fix_applied";
+                if !req.removed_source_keys.is_empty() {
+                    // `removedSourceKeys` is only meaningful on an apply, and only within scope.
+                    if !is_apply {
+                        return Err(Rejection::new(
+                            ErrorCode::Protocol,
+                            "removedSourceKeys is only allowed on fix_applied".to_owned(),
+                        ));
+                    }
+                    if let Some(bad) = req
+                        .removed_source_keys
+                        .iter()
+                        .find(|k| !record.target_source_keys.contains(k))
+                    {
+                        return Err(Rejection::new(
+                            ErrorCode::Protocol,
+                            format!("removedSourceKey '{bad}' outside frozen fix scope"),
+                        ));
+                    }
+                }
+                let next = match (record.state, is_apply) {
+                    (FixState::Proposed, false) => FixState::Accepted,
+                    (FixState::Accepted, true) => FixState::Applied,
+                    (current, _) => {
+                        return Err(Rejection::new(
+                            ErrorCode::Protocol,
+                            format!(
+                                "invalid fix transition from {} to {}",
+                                current.as_wire(),
+                                req.kind
+                            ),
+                        ));
+                    }
+                };
+                self.fix_states.get_mut(fix_id).expect("fix present").state = next;
+                Ok(LifecycleResponse {
+                    accepted: true,
+                    fix_state: Some(next.as_wire().to_owned()),
+                })
+            }
+            // Request-phase markers require an operation id only for tool events.
+            "tool_started" | "tool_finished" => {
+                if req.operation_id.is_none() {
+                    return Err(Rejection::new(
+                        ErrorCode::BadRequest,
+                        format!("{} requires operationId", req.kind),
+                    ));
+                }
+                Ok(LifecycleResponse {
+                    accepted: true,
+                    fix_state: None,
+                })
+            }
+            "request_started" | "response_started" | "request_completed" => Ok(LifecycleResponse {
+                accepted: true,
+                fix_state: None,
+            }),
+            other => Err(Rejection::new(
+                ErrorCode::BadRequest,
+                format!("unknown lifecycle kind '{other}'"),
+            )),
+        }
     }
 
     /// Generate a timeline response for the given range. Buckets are derived from candidate
@@ -599,6 +723,31 @@ fn dispatch<W: Write>(
                     Ok(response) => send(
                         writer,
                         "response.recommendations",
+                        envelope.id.clone(),
+                        serde_json::to_value(response).unwrap(),
+                    )?,
+                    Err(rejection) => send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?,
+                },
+            }
+            Ok(false)
+        }
+        "request.reportLifecycle" => {
+            match serde_json::from_value::<ReportLifecycleRequest>(envelope.payload.clone()) {
+                Err(err) => send_error(
+                    writer,
+                    envelope.id.clone(),
+                    ErrorCode::BadRequest,
+                    format!("invalid reportLifecycle payload: {err}"),
+                )?,
+                Ok(req) => match state.record_lifecycle(&req) {
+                    Ok(response) => send(
+                        writer,
+                        "response.lifecycle",
                         envelope.id.clone(),
                         serde_json::to_value(response).unwrap(),
                     )?,
@@ -993,6 +1142,102 @@ mod tests {
         // A repeat read at the same candidate revision returns the same fixId.
         let second = state.get_recommendations(&req).unwrap();
         assert_eq!(first.items[0].fix_id, second.items[0].fix_id);
+    }
+
+    fn lifecycle_req(value: serde_json::Value) -> ReportLifecycleRequest {
+        serde_json::from_value(value).unwrap()
+    }
+
+    /// Ingest a tools source and propose a fix, returning its fixId + one target key.
+    fn state_with_tool_fix() -> (EngineState, String, String) {
+        let mut state = fixed_state();
+        let ingest = ingest_req(serde_json::json!({
+            "sessionId": "S1", "sourceIdentity": "tool:mega", "sourceKind": "tools",
+            "observed": { "byteLen": 40000 }, "measurement": "observed", "coverage": "complete",
+            "provenance": "direct_api"
+        }));
+        state.ingest(SourceKind::Tools, &ingest, 2);
+        let recs = state
+            .get_recommendations(&recommendations_req(
+                serde_json::json!({ "sessionId": "S1" }),
+            ))
+            .unwrap();
+        let item = recs
+            .items
+            .iter()
+            .find(|i| i.action_kind == "unselect_tools")
+            .unwrap();
+        let fix_id = item.fix_id.clone();
+        let key = item.target_source_keys[0].clone();
+        (state, fix_id, key)
+    }
+
+    #[test]
+    fn fix_lifecycle_advances_proposed_accepted_applied() {
+        let (mut state, fix_id, key) = state_with_tool_fix();
+        let accepted = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": fix_id, "kind": "fix_accepted", "timestampMs": 3
+            })))
+            .unwrap();
+        assert_eq!(accepted.fix_state.as_deref(), Some("fix_accepted"));
+        let applied = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": fix_id, "kind": "fix_applied", "timestampMs": 4,
+                "removedSourceKeys": [key]
+            })))
+            .unwrap();
+        assert_eq!(applied.fix_state.as_deref(), Some("fix_applied"));
+    }
+
+    #[test]
+    fn fix_applied_before_accepted_is_protocol_error() {
+        let (mut state, fix_id, _key) = state_with_tool_fix();
+        let err = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": fix_id, "kind": "fix_applied", "timestampMs": 3
+            })))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::Protocol);
+    }
+
+    #[test]
+    fn removed_source_key_outside_scope_is_rejected() {
+        let (mut state, fix_id, _key) = state_with_tool_fix();
+        state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": fix_id, "kind": "fix_accepted", "timestampMs": 3
+            })))
+            .unwrap();
+        let err = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": fix_id, "kind": "fix_applied", "timestampMs": 4,
+                "removedSourceKeys": ["not-in-scope"]
+            })))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::Protocol);
+    }
+
+    #[test]
+    fn engine_owned_lifecycle_kind_is_rejected() {
+        let mut state = fixed_state();
+        let err = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "kind": "fix_verified", "timestampMs": 3
+            })))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::Protocol);
+    }
+
+    #[test]
+    fn lifecycle_for_unknown_fix_is_bad_request() {
+        let mut state = fixed_state();
+        let err = state
+            .record_lifecycle(&lifecycle_req(serde_json::json!({
+                "sessionId": "S1", "fixId": "nope", "kind": "fix_accepted", "timestampMs": 3
+            })))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::BadRequest);
     }
 
     #[test]

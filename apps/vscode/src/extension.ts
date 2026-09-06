@@ -155,6 +155,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Help the user actually prune tools: open VS Code's tool configuration if available,
   // else guide them to the Chat tools picker. No public API disables tools programmatically.
   context.subscriptions.push(vscode.commands.registerCommand('contextTop.manageTools', async () => {
+    // The user acting on the guided tool fix is its acceptance.
+    await provider?.acceptToolFix();
     const candidates = [
       'workbench.action.chat.configureTools',
       'github.copilot.chat.configureTools',
@@ -612,6 +614,23 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       this.post();
     } catch {
       // Recommendations are best-effort; never let a ranking error affect the UI.
+    }
+  }
+
+  /** Report the guided tool fix as accepted (proposed → accepted) when the user acts. */
+  async acceptToolFix(): Promise<void> {
+    const fixId = this.toolFix?.fixId;
+    if (!fixId) {
+      return;
+    }
+    try {
+      await this.engine.request('request.reportLifecycle', {
+        fixId,
+        kind: 'fix_accepted',
+        timestampMs: Date.now(),
+      });
+    } catch {
+      // Lifecycle reporting is best-effort.
     }
   }
 

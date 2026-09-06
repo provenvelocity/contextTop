@@ -208,6 +208,33 @@ pub struct RecommendationsResponse {
     pub items: Vec<RecommendationItem>,
 }
 
+/// `request.reportLifecycle` body. Adapter-reported request markers and fix transitions.
+/// Engine-owned kinds (`request_sent`, `fix_proposed`, `fix_verified`) are rejected here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportLifecycleRequest {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
+    pub kind: String,
+    pub timestamp_ms: u64,
+    #[serde(default)]
+    pub removed_source_keys: Vec<String>,
+}
+
+/// `response.lifecycle` body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleResponse {
+    pub accepted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_state: Option<String>,
+}
+
 /// `request.setConfig` body. The adapter's authoritative policy copy; the engine stores it
 /// and bumps `policyRevision` whenever the effective config changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]

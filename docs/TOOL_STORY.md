@@ -86,10 +86,14 @@ adapter calls [`request.getRecommendations`](IPC.md#requestgetrecommendations), 
 (`targetSourceKeys`) now come from the engine, and the Tools rule is correctly classified
 **Guided** (no supported API disables tools).
 
-**Remaining gap.** The proposed → accepted → applied → verified **lifecycle** is not yet
-emitted: the engine binary does not implement `request.reportLifecycle`, so the guided
-tool fix has a `fixId` but no lifecycle transitions. Wiring `reportLifecycle` (engine) +
-reporting `fix_accepted` when the user opens the Tools picker (adapter) is the next step.
+**Lifecycle.** The engine now handles [`request.reportLifecycle`](IPC.md#requestreportlifecycle):
+it registers `fix_proposed` when a `fixId` is first ranked, and validates the adapter's
+`fix_accepted` and `fix_applied` transitions (correct order; `removedSourceKeys` only on
+apply and only within the frozen `targetSourceKeys` scope; engine-owned kinds rejected).
+The adapter reports **`fix_accepted`** when the user acts on the Story card's *Manage
+tools…* action. `fix_verified` remains engine-owned and is **not yet emitted** — it needs
+the before/after snapshot-comparison rules in
+[`PRODUCT.md`](PRODUCT.md#contexttop-fix), which is the one remaining piece.
 
 ## 6. Per-call tool toggling: what's actually possible
 
@@ -123,5 +127,9 @@ maybe with AI* — is bounded by the platform and the honesty contract:
 - [x] Webview stays metrics-only; engine is the ranking authority — `ARCHITECTURE.md`.
 - [x] Story card renders the engine `unselect_tools` item (`fixId`, engine savings,
       `targetSourceKeys`, guided) — shipped.
-- [ ] **Open:** emit the fix **lifecycle** (`fix_accepted`/`applied`/`verified`) — blocked
-      on `request.reportLifecycle` in the engine binary.
+- [x] Fix lifecycle `fix_proposed` / `fix_accepted` / `fix_applied` handled by
+      `request.reportLifecycle` with scope validation; adapter reports `fix_accepted` on
+      the *Manage tools…* action — shipped.
+- [ ] **Open:** emit `fix_verified` — needs the before/after snapshot-comparison rules
+      (same `model_id`, unchanged `unknown_source_count`, delta limited to
+      `targetSourceKeys`).
