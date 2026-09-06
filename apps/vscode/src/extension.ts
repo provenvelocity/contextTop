@@ -525,6 +525,7 @@ function setupAmbientCollectors(
   const interval = setInterval(() => {
     scanTools();
     scanInstructions();
+    void provider?.refreshToolRecommendation();
   }, 5000);
   context.subscriptions.push(new vscode.Disposable(() => clearInterval(interval)));
 }
@@ -546,6 +547,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   };
   private lastRequest?: CopilotRequestMetrics;
   private analytics?: CopilotAnalyticsSnapshot;
+  private toolFix?: { fixId: string; savedMin: number; savedMax: number; targetCount: number; execution: string };
 
   constructor(private engine: EngineClient, private thresholds: Thresholds, private windowMinutes: number) {
     this.engine.onEvent('event.metrics', (event: any) => {
@@ -589,6 +591,28 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   updateAnalytics(stats: CopilotAnalyticsSnapshot): void {
     this.analytics = stats;
     this.post();
+  }
+
+  /** Ask the engine to rank current pressure and keep the `unselect_tools` fix (fixId +
+   *  engine-estimated savings) so the Story card renders the ranked recommendation. */
+  async refreshToolRecommendation(): Promise<void> {
+    try {
+      const res = await this.engine.request('request.getRecommendations', {});
+      const items = ((res.payload as { items?: unknown[] } | undefined)?.items ?? []) as Array<Record<string, unknown>>;
+      const tool = items.find((it) => it.actionKind === 'unselect_tools');
+      this.toolFix = tool
+        ? {
+            fixId: String(tool.fixId ?? ''),
+            savedMin: Number(tool.estimatedTokensSavedMin ?? 0),
+            savedMax: Number(tool.estimatedTokensSavedMax ?? 0),
+            targetCount: Array.isArray(tool.targetSourceKeys) ? tool.targetSourceKeys.length : 0,
+            execution: String(tool.execution ?? 'guided'),
+          }
+        : undefined;
+      this.post();
+    } catch {
+      // Recommendations are best-effort; never let a ranking error affect the UI.
+    }
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -646,6 +670,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       layout: readDashboardLayout(),
       request: this.lastRequest,
       analytics: this.analytics,
+      toolFix: this.toolFix,
     });
   }
 
@@ -737,6 +762,8 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   .story.on { display: flex; }
   .story-headline { font-size: 13px; font-weight: 600; }
   .story-detail { font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.4; }
+  .story-rec { font-size: 11px; color: var(--vscode-foreground); }
+  .story-rec .chip { font-size: 9px; color: #a06cf0; background: rgba(160,108,240,0.14); border-radius: 8px; padding: 1px 6px; margin-left: 6px; }
   .story-actions { display: flex; gap: 6px; }
   .story-actions button { font: inherit; font-size: 11px; color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c); border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
   .story-table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -760,6 +787,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   <div class="story" id="story" data-card="story">
     <div class="story-headline" id="storyHeadline">Collecting context…</div>
     <div class="story-detail" id="storyDetail"></div>
+    <div class="story-rec" id="storyRec"></div>
     <div class="story-actions"><button id="btnManageTools">Manage tools…</button></div>
     <table class="story-table"><tbody id="storyTools"></tbody></table>
   </div>
@@ -1428,7 +1456,16 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     }
     document.getElementById('storyDetail').innerHTML = detail;
 
-    // Biggest unused tools first — the clearest cut candidates.
+    // Engine-ranked recommendation (unselect_tools) — the contract-aligned fix path.
+    var recEl = document.getElementById('storyRec');
+    var fix = lastM.toolFix;
+    if (fix && fix.fixId) {
+      var shortId = String(fix.fixId).slice(-6);
+      recEl.innerHTML = '💡 Engine fix: disable unrelated tools · save ~' + fmt(fix.savedMin) + '–' + fmt(fix.savedMax)
+        + ' tokens <span class="chip">' + esc(fix.execution) + '</span> <span class="chip">fix ' + esc(shortId) + '</span>';
+    } else {
+      recEl.innerHTML = '';
+    }
     rows.sort(function (x, y) { return (x.used === y.used) ? y.tokens - x.tokens : (x.used ? 1 : -1); });
     var html = '';
     for (var i = 0; i < Math.min(rows.length, 10); i++) {

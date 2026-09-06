@@ -62,4 +62,6 @@ export interface DashboardEvent {
   layout: DashboardCardId[];
   request?: CopilotRequestMetrics;
   analytics?: CopilotAnalyticsSnapshot;
+  /** Engine-ranked `unselect_tools` recommendation, when tool pressure is high enough. */
+  toolFix?: { fixId: string; savedMin: number; savedMax: number; targetCount: number; execution: string };
 }

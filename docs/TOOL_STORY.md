@@ -77,14 +77,19 @@ recommendation contract already covers this exact action:
   lifecycle is `proposed → accepted → applied → verified`, with the engine owning
   `fix_proposed`/`fix_verified`.
 
-**Current implementation vs target.** The shipped Story card computes the narrative
-**adapter-side** (it joins `vscode.lm.tools` cost with `tool_call` usage in the webview).
-That is consistent with the guided classification but does not yet flow through the
-engine's `unselect_tools` recommendation. The alignment step (future) is to emit the
-Story as a `getRecommendations` item so it gains a `fixId`, `targetSourceKeys`, and the
-proposed/accepted/applied/verified lifecycle — with the webview still rendering only
-engine view-models (metrics-only `postMessage`, per
-[`ARCHITECTURE.md`](ARCHITECTURE.md#vs-code-adapter-responsibilities)).
+**Current implementation.** The Story card renders the engine-ranked recommendation: the
+adapter calls [`request.getRecommendations`](IPC.md#requestgetrecommendations), takes the
+`unselect_tools` item, and shows its engine-computed `estimatedTokensSaved` range,
+`fixId`, and `execution: guided` alongside the used/unused tool breakdown. The narrative
+(used vs. unused, per-tool cost) is still computed adapter-side from
+`vscode.lm.tools` + `tool_call` usage; the **savings, fix identity, and scope**
+(`targetSourceKeys`) now come from the engine, and the Tools rule is correctly classified
+**Guided** (no supported API disables tools).
+
+**Remaining gap.** The proposed → accepted → applied → verified **lifecycle** is not yet
+emitted: the engine binary does not implement `request.reportLifecycle`, so the guided
+tool fix has a `fixId` but no lifecycle transitions. Wiring `reportLifecycle` (engine) +
+reporting `fix_accepted` when the user opens the Tools picker (adapter) is the next step.
 
 ## 6. Per-call tool toggling: what's actually possible
 
@@ -116,5 +121,7 @@ maybe with AI* — is bounded by the platform and the honesty contract:
 - [x] Fix is **Guided**, proposed-never-applied — `PRODUCT.md#contexttop-fix`.
 - [x] Maps to `actionKind: "unselect_tools"`, `execution: "guided"` — `IPC.md`.
 - [x] Webview stays metrics-only; engine is the ranking authority — `ARCHITECTURE.md`.
-- [ ] **Open:** migrate the adapter-side Story to an engine `getRecommendations`
-      `unselect_tools` item so it gains a `fixId` and the fix lifecycle.
+- [x] Story card renders the engine `unselect_tools` item (`fixId`, engine savings,
+      `targetSourceKeys`, guided) — shipped.
+- [ ] **Open:** emit the fix **lifecycle** (`fix_accepted`/`applied`/`verified`) — blocked
+      on `request.reportLifecycle` in the engine binary.

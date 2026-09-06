@@ -98,7 +98,8 @@ const RULES: [Rule; 4] = [
         action: ActionKind::UnselectTools,
         title: "Review enabled tools",
         detail: "Disable tools unrelated to the current task.",
-        execution: Execution::Executable,
+        // Guided: no supported API disables another extension's tools (see docs/PRODUCT.md).
+        execution: Execution::Guided,
     },
     Rule {
         kind: SourceKind::Files,
@@ -185,5 +186,14 @@ mod tests {
         );
         assert_eq!(recs[0].action_kind, ActionKind::StartCleanChat);
         assert_eq!(recs[1].action_kind, ActionKind::SummarizeTerminal);
+    }
+
+    #[test]
+    fn tool_unselect_is_guided() {
+        let recs = rank(&[input("tool:a", SourceKind::Tools, 12_000)], 1_000);
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].action_kind, ActionKind::UnselectTools);
+        // No supported API disables tools, so it must be guided, not executable.
+        assert_eq!(recs[0].execution, Execution::Guided);
     }
 }
