@@ -183,3 +183,35 @@ The bespoke canvas has been made data-driven:
 > A full third-party charting library was intentionally **not** adopted — the series
 > abstraction keeps the CSP-nonce webview dependency-free while still making new series
 > and distributions cheap to add.
+
+---
+
+## 5. The story: prune tools you don't use
+
+The measurement exists to drive an action. The **Story card** turns the numbers into a
+plain-English narrative and a lever:
+
+- Joins per-tool schema cost (`vscode.lm.tools`, tokenized) with the tools Copilot
+  **actually invoked** this session (`tool_call` span names).
+- Headline: *"N tools loaded · Xk tokens (~Y% of last request)."*
+- Detail: which tools were called, and how many loaded tools **weren't** — with the
+  token savings from turning them off.
+- Ranked list of the biggest **unused** tools (the clearest cut candidates).
+- **Manage tools…** action opens VS Code's tool configuration (or guides to the Chat
+  Tools picker).
+
+Real-log finding that motivates this: the tools Copilot invoked were built-ins
+(`file_search`, `list_dir`, `manage_todo_list`), while the ~24k-token schema load is
+mostly **extension/MCP tools that went uncalled** — dead weight on every request.
+
+### Per-call tool toggling (feasibility)
+
+- **Automatic per-call on/off is not exposed to extensions.** VS Code's `vscode.lm.tools`
+  is read-only; there is no API to enable/disable another extension's tool for standard
+  Copilot chat. Copilot already does server-side reduction via *virtual tools* grouping
+  (seen as `debugName: summarizeVirtualTools`).
+- **What contextTop can do:** measure cost vs. usage, recommend cuts, and route the user
+  to the Tools picker / tool sets to disable unused tools (persisted, not per-call).
+- **AI-assisted (future):** for a given prompt, an LLM could suggest a minimal tool
+  subset; contextTop would still only *recommend* — the user (or a tool set) applies it.
+  This stays a recommendation, never a silent mutation of Copilot state.

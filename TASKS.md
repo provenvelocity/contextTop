@@ -6,6 +6,8 @@
 
 ## Completed
 
+- [x] 2026-09-06 — **Tool-efficiency story card + prune action** — Add a Story card that narrates tool context cost: joins per-tool schema cost (`vscode.lm.tools`) with tools Copilot actually invoked (`tool_call` spans), headlines total tool tokens + % of last request, lists biggest unused tools with token savings, and a "Manage tools…" action that opens VS Code tool config or guides to the Chat Tools picker. Documented per-call AI-toggling feasibility (recommend-only; no API to disable tools programmatically). New `story` card in layout + `contextTop.manageTools` command.
+
 - [x] 2026-09-06 — **Chart metric selector + all-metrics overlay** — Add a Request-mode dropdown to plot All metrics (default, each normalized to its own max), Composition, or a single per-request metric in real units (input / budget % / cache hit % / uncached / context growth / TTFT / latency / output / billing). Chart legend shows live per-metric values; picking a metric switches to Request mode.
 - [x] 2026-09-06 — **Fix F5 crash: harden engine process error handling** — Add missing `error` handlers on the engine `ChildProcess` and its stdin/stdout/stderr streams (unhandled EPIPE/ENOENT was throwing uncaught and crashing the extension host), guard writes against a dead/unwritable engine, add `export function deactivate()` to kill the engine on host reload (prevents orphan buildup across F5), and stop the engine output channel from stealing focus.
 

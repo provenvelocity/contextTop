@@ -10,6 +10,7 @@ import { CopilotAnalyticsSnapshot } from './copilotAnalytics';
 
 /** Reorderable, hideable dashboard cards. `header` and control toolbar are always shown. */
 export type DashboardCardId =
+  | 'story'
   | 'request'
   | 'requestBreakdown'
   | 'gauges'
@@ -19,6 +20,7 @@ export type DashboardCardId =
   | 'actions';
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardCardId[] = [
+  'story',
   'request',
   'requestBreakdown',
   'gauges',

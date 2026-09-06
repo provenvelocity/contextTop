@@ -152,6 +152,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await vscode.commands.executeCommand('workbench.view.extension.contextTop');
   }));
 
+  // Help the user actually prune tools: open VS Code's tool configuration if available,
+  // else guide them to the Chat tools picker. No public API disables tools programmatically.
+  context.subscriptions.push(vscode.commands.registerCommand('contextTop.manageTools', async () => {
+    const candidates = [
+      'workbench.action.chat.configureTools',
+      'github.copilot.chat.configureTools',
+      'workbench.action.chat.manageTools',
+    ];
+    for (const cmd of candidates) {
+      try {
+        await vscode.commands.executeCommand(cmd);
+        return;
+      } catch {
+        // try next
+      }
+    }
+    const pick = await vscode.window.showInformationMessage(
+      'To cut tool context cost, open the Chat view and use the Tools picker (the wrench/tools icon) to turn off tools you are not using. MCP and extension tools you disable stop being sent with every request.',
+      'Open Chat',
+      'Open Settings'
+    );
+    if (pick === 'Open Chat') {
+      await vscode.commands.executeCommand('workbench.action.chat.open').then(undefined, () => undefined);
+    } else if (pick === 'Open Settings') {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'chat.tools');
+    }
+  }));
+
   // Send the authoritative policy copy to the engine (drives policyRevision).
   void sendConfig(engine);
   context.subscriptions.push(
@@ -316,6 +344,7 @@ interface AmbientInventory {
   instructionsCount: number;
   editorsCount: number;
   terminalsCount: number;
+  toolsTotalTokens: number;
   topTools: Array<{ name: string; tokens: number }>;
   instrFiles: Array<{ name: string; tokens: number }>;
 }
@@ -325,6 +354,7 @@ const ambientInventory: AmbientInventory = {
   instructionsCount: 0,
   editorsCount: 0,
   terminalsCount: 0,
+  toolsTotalTokens: 0,
   topTools: [],
   instrFiles: [],
 };
@@ -453,11 +483,14 @@ function setupAmbientCollectors(
     const tools = (vscode.lm?.tools ?? []) as ReadonlyArray<{ name: string; description?: string; inputSchema?: unknown }>;
     ambientInventory.toolsCount = tools.length;
     const detail: Array<{ name: string; tokens: number }> = [];
+    let totalTokens = 0;
     for (const tool of tools) {
       // The token cost of a loaded tool is its name + description + schema.
       const schemaText = JSON.stringify({ n: tool.name, d: tool.description ?? '', s: tool.inputSchema ?? {} });
       const bytes = Buffer.byteLength(schemaText, 'utf8');
-      detail.push({ name: tool.name, tokens: estTokens(bytes) });
+      const toolTokens = estTokens(bytes);
+      totalTokens += toolTokens;
+      detail.push({ name: tool.name, tokens: toolTokens });
       ingest(engine, {
         sourceIdentity: `tool:${tool.name}`,
         sourceKind: 'tools',
@@ -467,7 +500,8 @@ function setupAmbientCollectors(
       });
     }
     detail.sort((a, b) => b.tokens - a.tokens);
-    ambientInventory.topTools = detail.slice(0, 12);
+    ambientInventory.toolsTotalTokens = totalTokens;
+    ambientInventory.topTools = detail.slice(0, 60);
     pushInventory();
   };
 
@@ -506,6 +540,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     instructionsCount: 0,
     editorsCount: 0,
     terminalsCount: 0,
+    toolsTotalTokens: 0,
     topTools: [],
     instrFiles: [],
   };
@@ -698,6 +733,17 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   .compact-table { margin-top: 7px; }
   .empty { color: var(--vscode-descriptionForeground); }
   .anomaly { color: var(--vscode-editorWarning-foreground, #e6a04d); margin: 3px 0; }
+  .story { display: none; flex-direction: column; gap: 6px; flex: 0 0 auto; padding: 10px 12px; border: 1px solid var(--vscode-widget-border); border-left: 3px solid #a06cf0; border-radius: 5px; background: rgba(160,108,240,0.06); }
+  .story.on { display: flex; }
+  .story-headline { font-size: 13px; font-weight: 600; }
+  .story-detail { font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.4; }
+  .story-actions { display: flex; gap: 6px; }
+  .story-actions button { font: inherit; font-size: 11px; color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #0e639c); border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  .story-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .story-table td { padding: 2px 4px; }
+  .story-badge { font-size: 9px; padding: 1px 6px; border-radius: 8px; }
+  .story-badge.used { color: #4ec98a; background: rgba(78,201,138,0.14); }
+  .story-badge.unused { color: #e5a44e; background: rgba(229,164,78,0.14); }
 </style>
 </head>
 <body>
@@ -710,6 +756,13 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="headline"><b id="hlTotal">0</b><small id="hlUnit">tokens</small></div>
   </header>
+
+  <div class="story" id="story" data-card="story">
+    <div class="story-headline" id="storyHeadline">Collecting context…</div>
+    <div class="story-detail" id="storyDetail"></div>
+    <div class="story-actions"><button id="btnManageTools">Manage tools…</button></div>
+    <table class="story-table"><tbody id="storyTools"></tbody></table>
+  </div>
 
   <div class="reqstrip" id="reqstrip" data-card="request">
     <span><span class="rk">Request in</span><span class="rv" id="rIn">—</span></span>
@@ -1326,7 +1379,65 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     renderStatus(total, isReq);
     updateChartLegend(bySource);
     renderTable(bySource, total);
+    renderStory();
     requestAnimationFrame(draw);
+  }
+
+  // Normalize a tool name for matching lm.tools (loaded) against invoked span names.
+  function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+  // The narrative: tools are a large, mostly-unused slice of every request.
+  function renderStory() {
+    var wrap = document.getElementById('story');
+    if (!lastM) { return; }
+    var inv = lastM.inventory || {};
+    var a = lastM.analytics;
+    var toolTokens = inv.toolsTotalTokens || 0;
+    var toolCount = inv.toolsCount || 0;
+    if (toolCount === 0 && toolTokens === 0) { wrap.classList.remove('on'); return; }
+
+    var latest = requestHistory.length ? requestHistory[requestHistory.length - 1] : null;
+    var input = latest ? latest.total : 0;
+    var pct = (input > 0 && toolTokens > 0) ? Math.round((toolTokens / input) * 100) : null;
+
+    var usedNames = (a && a.tools) ? a.tools.map(function (t) { return t.name; }) : [];
+    var usedSet = {};
+    usedNames.forEach(function (nm) { usedSet[normName(nm)] = true; });
+
+    var loaded = inv.topTools || [];
+    var unusedCost = 0, unusedCount = 0;
+    var rows = loaded.map(function (t) {
+      var used = !!usedSet[normName(t.name)];
+      if (!used) { unusedCost += t.tokens; unusedCount++; }
+      return { name: t.name, tokens: t.tokens, used: used };
+    });
+
+    var head = '🧰 ' + toolCount + ' tools loaded · ' + fmt(toolTokens) + ' tokens';
+    if (pct !== null) { head += ' (~' + pct + '% of last request)'; }
+    document.getElementById('storyHeadline').textContent = head;
+
+    var detail = '';
+    if (usedNames.length) {
+      detail += 'This session Copilot actually called: ' + esc(usedNames.slice(0, 6).join(', ')) + '. ';
+    } else {
+      detail += 'No tool calls observed yet this session. ';
+    }
+    if (unusedCount > 0) {
+      detail += unusedCount + ' loaded tool' + (unusedCount === 1 ? '' : 's') + " weren't called — turning them off could save ~"
+        + fmt(unusedCost) + ' tokens on every request.';
+    }
+    document.getElementById('storyDetail').innerHTML = detail;
+
+    // Biggest unused tools first — the clearest cut candidates.
+    rows.sort(function (x, y) { return (x.used === y.used) ? y.tokens - x.tokens : (x.used ? 1 : -1); });
+    var html = '';
+    for (var i = 0; i < Math.min(rows.length, 10); i++) {
+      var r = rows[i];
+      html += '<tr><td><span class="story-badge ' + (r.used ? 'used' : 'unused') + '">' + (r.used ? 'used' : 'unused')
+        + '</span></td><td>' + esc(r.name) + '</td><td class="num" style="text-align:right">' + fmt(r.tokens) + '</td></tr>';
+    }
+    document.getElementById('storyTools').innerHTML = html;
+    wrap.classList.add('on');
   }
 
   // Chart legend reflects what the graph plots: sources (candidate/composition) or metrics.
@@ -1530,6 +1641,12 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   document.getElementById('btnOtlp').addEventListener('click', function () {
     vscode.postMessage({ type: 'command', id: 'contextTop.enableAgentDebugLog' });
   });
+  var btnTools = document.getElementById('btnManageTools');
+  if (btnTools) {
+    btnTools.addEventListener('click', function () {
+      vscode.postMessage({ type: 'command', id: 'contextTop.manageTools' });
+    });
+  }
   var wbtns = document.querySelectorAll('#wsel button');
   for (var wi = 0; wi < wbtns.length; wi++) {
     wbtns[wi].addEventListener('click', function () {

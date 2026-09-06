@@ -32,10 +32,10 @@
         "contextTop.maxStorageMiB": { "type": "number", "default": 100, "minimum": 16, "maximum": 1024, "description": "Hard cap on local contextTop storage before oldest data is evicted." },
         "contextTop.dashboardLayout": {
           "type": "array",
-          "default": ["request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"],
-          "items": { "type": "string", "enum": ["request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"] },
+          "default": ["story", "request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"],
+          "items": { "type": "string", "enum": ["story", "request", "requestBreakdown", "gauges", "chart", "sources", "analytics", "actions"] },
           "uniqueItems": true,
-          "markdownDescription": "Which dashboard cards to show and in what order. Cards omitted from the list are hidden. Available cards: `request`, `requestBreakdown`, `gauges`, `chart`, `sources`, `analytics`, `actions`."
+          "markdownDescription": "Which dashboard cards to show and in what order. Cards omitted from the list are hidden. Available cards: `story`, `request`, `requestBreakdown`, `gauges`, `chart`, `sources`, `analytics`, `actions`."
         }
       }
     }
