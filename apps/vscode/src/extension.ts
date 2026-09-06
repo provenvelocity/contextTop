@@ -663,6 +663,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 0 0 auto; }
   .toolbar button { font: inherit; font-size: 10px; color: var(--vscode-button-secondaryForeground, var(--vscode-foreground)); background: var(--vscode-button-secondaryBackground, transparent); border: 1px solid var(--vscode-widget-border); border-radius: 4px; padding: 3px 8px; cursor: pointer; }
   .toolbar button:hover { background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.15)); }
+  .toolbar select { font: inherit; font-size: 10px; color: var(--vscode-foreground); background: var(--vscode-dropdown-background, transparent); border: 1px solid var(--vscode-widget-border); border-radius: 4px; padding: 3px 6px; cursor: pointer; }
   .toolbar .spacer { flex: 1 1 auto; }
   .wsel { display: inline-flex; gap: 2px; }
   .wsel button.active { background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); border-color: transparent; }
@@ -734,6 +735,19 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       <button data-mode="candidate" class="active">Candidate</button>
       <button data-mode="request">Request</button>
     </span>
+    <select id="metric" title="What the graph plots in Request mode">
+      <option value="all" selected>All metrics</option>
+      <option value="composition">Composition</option>
+      <option value="input">Input tokens</option>
+      <option value="budget">Budget %</option>
+      <option value="cacheHit">Cache hit %</option>
+      <option value="uncached">Uncached tokens</option>
+      <option value="growth">Context growth</option>
+      <option value="ttft">TTFT (ms)</option>
+      <option value="latency">Latency (ms)</option>
+      <option value="output">Output tokens</option>
+      <option value="billing">Billing (nAIU)</option>
+    </select>
     <span class="wsel" id="wsel">
       <button data-min="1">1m</button>
       <button data-min="5">5m</button>
@@ -870,6 +884,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   var history = [];   // { ts, total, bySource }
   var requestHistory = [];  // decomposed per-request composition points
   var mode = 'candidate';   // 'candidate' | 'request'
+  var reqMetric = 'all'; // what the request chart plots
   var userChoseMode = false; // once true, stop auto-switching mode
   var lastM = null;         // last metrics event, for re-render on mode toggle
   var lastRequestTs = null; // dedupe: request events repeat on every metrics push
@@ -1000,49 +1015,99 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       ctx.restore();
     }
 
-    // Request mode: one line per context item over time + budget line, so a human sees
-    // which item (tools, system prompt, history…) is growing toward the budget.
+    // Request mode renders per-request data over time; the sub-view is reqMetric.
     if (mode === 'request') {
-      guide(budget, CRIT_COLOR, 'budget');
-      var STACK = ['instructions', 'tools', 'history', 'prompt', 'unknown'];
       var pts = [];
       for (var pi = 0; pi < n; pi++) if (H[pi].ts >= t0) pts.push(H[pi]);
-      // One colored line (with dots) per source item.
-      for (var si = 0; si < STACK.length; si++) {
-        var kind = STACK[si];
-        var color = COLORS[kind] || '#777';
-        var any = false, started = false;
+
+      // Composition: one line per context item + budget line.
+      if (reqMetric === 'composition') {
+        guide(budget, CRIT_COLOR, 'budget');
+        var STACK = ['instructions', 'tools', 'history', 'prompt', 'unknown'];
+        for (var si = 0; si < STACK.length; si++) {
+          var kind = STACK[si];
+          var color = COLORS[kind] || '#777';
+          var any = false, started = false;
+          ctx.beginPath();
+          for (var li = 0; li < pts.length; li++) {
+            var vv = (pts[li].bySource && pts[li].bySource[kind]) || 0;
+            if (vv > 0) any = true;
+            var lx = px(pts[li].ts), ly = py(vv);
+            if (!started) { ctx.moveTo(lx, ly); started = true; } else ctx.lineTo(lx, ly);
+          }
+          if (!any) continue;
+          ctx.strokeStyle = color; ctx.lineWidth = 1.75; ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 1;
+          for (var di = 0; di < pts.length; di++) {
+            var dv = (pts[di].bySource && pts[di].bySource[kind]) || 0;
+            if (dv <= 0) continue;
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(px(pts[di].ts), py(dv), 2.5, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        ctx.strokeStyle = zoneColor(0); ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        for (var li = 0; li < pts.length; li++) {
-          var vv = (pts[li].bySource && pts[li].bySource[kind]) || 0;
-          if (vv > 0) any = true;
-          var lx = px(pts[li].ts), ly = py(vv);
-          if (!started) { ctx.moveTo(lx, ly); started = true; } else ctx.lineTo(lx, ly);
+        for (var ti = 0; ti < pts.length; ti++) {
+          var tx = px(pts[ti].ts), ty = py(pts[ti].total);
+          if (ti === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
         }
-        if (!any) continue;
-        ctx.strokeStyle = color; ctx.lineWidth = 1.75; ctx.globalAlpha = 0.9; ctx.stroke(); ctx.globalAlpha = 1;
-        // Dots so single/sparse requests are still visible.
-        for (var di = 0; di < pts.length; di++) {
-          var dv = (pts[di].bySource && pts[di].bySource[kind]) || 0;
-          if (dv <= 0) continue;
-          ctx.fillStyle = color;
-          ctx.beginPath(); ctx.arc(px(pts[di].ts), py(dv), 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.stroke(); ctx.globalAlpha = 1;
+        for (var oi = 0; oi < pts.length; oi++) {
+          if (budget > 0 && pts[oi].total > budget) {
+            ctx.fillStyle = CRIT_COLOR;
+            ctx.beginPath(); ctx.arc(px(pts[oi].ts), py(pts[oi].total), 3, 0, Math.PI * 2); ctx.fill();
+          }
         }
+        return;
       }
-      // Total line (thin) + red dots where a request blew the budget.
-      ctx.strokeStyle = zoneColor(0); ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+
+      // All metrics: overlay every metric, each normalized to its own visible max so
+      // their shapes/trends are comparable despite different units.
+      if (reqMetric === 'all') {
+        var mkeys = Object.keys(METRIC_META);
+        for (var mk = 0; mk < mkeys.length; mk++) {
+          var meta = METRIC_META[mkeys[mk]];
+          var vals = [], vmax = 0, anyv = false;
+          for (var vi = 0; vi < pts.length; vi++) {
+            var val = metricValue(pts, vi, mkeys[mk]);
+            vals.push(val); if (val > vmax) vmax = val; if (val > 0) anyv = true;
+          }
+          if (!anyv || vmax <= 0) continue;
+          var mstarted = false;
+          ctx.beginPath();
+          for (var pj = 0; pj < pts.length; pj++) {
+            var nx = px(pts[pj].ts), ny = h - (vals[pj] / vmax) * h * 0.95;
+            if (!mstarted) { ctx.moveTo(nx, ny); mstarted = true; } else ctx.lineTo(nx, ny);
+          }
+          ctx.strokeStyle = meta.color; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
+          for (var dj = 0; dj < pts.length; dj++) {
+            ctx.fillStyle = meta.color;
+            ctx.beginPath(); ctx.arc(px(pts[dj].ts), h - (vals[dj] / vmax) * h * 0.95, 2, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        ctx.fillStyle = 'rgba(150,150,150,0.9)'; ctx.font = '9px var(--vscode-font-family)';
+        ctx.fillText('all metrics · each normalized to its own max', 4, 10);
+        return;
+      }
+
+      // Single metric in real units.
+      var smeta = METRIC_META[reqMetric] || { label: reqMetric, color: '#4f9cff', unit: '' };
+      var svals = [], smax = smeta.unit === '%' ? 100 : 1;
+      for (var svi = 0; svi < pts.length; svi++) { var sv = metricValue(pts, svi, reqMetric); svals.push(sv); if (sv > smax) smax = sv; }
+      smax *= 1.1;
+      var sstarted = false;
       ctx.beginPath();
-      for (var ti = 0; ti < pts.length; ti++) {
-        var tx = px(pts[ti].ts), ty = py(pts[ti].total);
-        if (ti === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
+      for (var spj = 0; spj < pts.length; spj++) {
+        var sx = px(pts[spj].ts), sy = h - (svals[spj] / smax) * h;
+        if (!sstarted) { ctx.moveTo(sx, sy); sstarted = true; } else ctx.lineTo(sx, sy);
       }
-      ctx.stroke(); ctx.globalAlpha = 1;
-      for (var oi = 0; oi < pts.length; oi++) {
-        if (budget > 0 && pts[oi].total > budget) {
-          ctx.fillStyle = CRIT_COLOR;
-          ctx.beginPath(); ctx.arc(px(pts[oi].ts), py(pts[oi].total), 3, 0, Math.PI * 2); ctx.fill();
-        }
+      ctx.strokeStyle = smeta.color; ctx.lineWidth = 2; ctx.globalAlpha = 0.95; ctx.stroke(); ctx.globalAlpha = 1;
+      for (var sdj = 0; sdj < pts.length; sdj++) {
+        ctx.fillStyle = smeta.color;
+        ctx.beginPath(); ctx.arc(px(pts[sdj].ts), h - (svals[sdj] / smax) * h, 2.5, 0, Math.PI * 2); ctx.fill();
       }
+      var slatest = svals.length ? svals[svals.length - 1] : 0;
+      ctx.fillStyle = smeta.color; ctx.font = '10px var(--vscode-font-family)';
+      ctx.fillText(smeta.label + ' — ' + fmtMetric(slatest, smeta.unit), 4, 11);
       return;
     }
 
@@ -1191,8 +1256,48 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       ts: r.ts || Date.now(),
       total: input,
       budget: r.promptBudgetTokens || r.contextWindowTokens || 0,
+      cached: r.cachedTokens || 0,
+      output: r.outputTokens || 0,
+      ttft: typeof r.ttftMs === 'number' ? r.ttftMs : null,
+      latency: typeof r.latencyMs === 'number' ? r.latencyMs : null,
+      billing: typeof r.usageNanoAiu === 'number' ? r.usageNanoAiu : null,
       bySource: { instructions: sys, tools: tools, prompt: prompt, unknown: other }
     };
+  }
+
+  // Numeric value of the selected per-request metric at point i (growth needs prev).
+  function metricValue(pts, i, kind) {
+    var p = pts[i];
+    switch (kind) {
+      case 'input': return p.total || 0;
+      case 'output': return p.output || 0;
+      case 'ttft': return p.ttft || 0;
+      case 'latency': return p.latency || 0;
+      case 'billing': return p.billing || 0;
+      case 'uncached': return Math.max(0, (p.total || 0) - (p.cached || 0));
+      case 'cacheHit': return p.total > 0 ? ((p.cached || 0) / p.total) * 100 : 0;
+      case 'budget': return p.budget > 0 ? (p.total / p.budget) * 100 : 0;
+      case 'growth': return i > 0 ? Math.abs((p.total || 0) - (pts[i - 1].total || 0)) : 0;
+      default: return 0;
+    }
+  }
+
+  var METRIC_META = {
+    input: { label: 'Input tokens', color: '#4f9cff', unit: 'tok' },
+    budget: { label: 'Budget %', color: '#e5484d', unit: '%' },
+    cacheHit: { label: 'Cache hit %', color: '#4ec98a', unit: '%' },
+    uncached: { label: 'Uncached tokens', color: '#c9a04e', unit: 'tok' },
+    growth: { label: 'Context growth', color: '#e5a44e', unit: 'tok' },
+    ttft: { label: 'TTFT', color: '#a06cf0', unit: 'ms' },
+    latency: { label: 'Latency', color: '#e57ec9', unit: 'ms' },
+    output: { label: 'Output tokens', color: '#38c5c5', unit: 'tok' },
+    billing: { label: 'Billing', color: '#6c7ff0', unit: 'nAIU' }
+  };
+  function fmtMetric(v, unit) {
+    if (unit === '%') return Math.round(v) + '%';
+    if (unit === 'ms') return fmtMs(v);
+    if (unit === 'nAIU') return String(Math.round(v));
+    return fmt(v);
   }
 
   // Render headline, gauges, table, legend, and status for the active mode.
@@ -1219,9 +1324,30 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     document.getElementById('gRate').textContent = fmt(rate) + '/s';
 
     renderStatus(total, isReq);
-    renderLegend(bySource);
+    updateChartLegend(bySource);
     renderTable(bySource, total);
     requestAnimationFrame(draw);
+  }
+
+  // Chart legend reflects what the graph plots: sources (candidate/composition) or metrics.
+  function updateChartLegend(bySource) {
+    var el = document.getElementById('legend');
+    if (mode === 'request' && reqMetric === 'all') {
+      var html = '';
+      var keys = Object.keys(METRIC_META);
+      for (var i = 0; i < keys.length; i++) {
+        var meta = METRIC_META[keys[i]];
+        var lv = requestHistory.length ? metricValue(requestHistory, requestHistory.length - 1, keys[i]) : 0;
+        html += '<span><i class="swatch" style="background:' + meta.color + '"></i>' + meta.label + ' ' + fmtMetric(lv, meta.unit) + '</span>';
+      }
+      el.innerHTML = html || '<span>Waiting for requests…</span>';
+      return;
+    }
+    if (mode === 'request' && reqMetric !== 'composition') {
+      var m = METRIC_META[reqMetric];
+      if (m) { el.innerHTML = '<span><i class="swatch" style="background:' + m.color + '"></i>' + m.label + '</span>'; return; }
+    }
+    renderLegend(bySource);
   }
 
   function setMode(next) {
@@ -1417,6 +1543,15 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
     mbtns[mi].addEventListener('click', function () {
       userChoseMode = true;
       setMode(this.getAttribute('data-mode'));
+    });
+  }
+  var metricSel = document.getElementById('metric');
+  if (metricSel) {
+    metricSel.addEventListener('change', function () {
+      reqMetric = this.value;
+      userChoseMode = true;
+      // Picking a metric implies the request view.
+      if (mode !== 'request') { setMode('request'); } else { renderView(); }
     });
   }
 

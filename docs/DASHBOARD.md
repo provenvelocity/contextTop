@@ -156,6 +156,11 @@ palette in [`METRICS.md`](METRICS.md#source-categories).
 - [x] Replace the guessed/absent budget with the observed `models.json` context window.
 - [x] Add discovery-based hidden-context counts (agents/skills/instructions/hooks loaded).
 - [x] Add real cost (`copilotUsageNanoAiu`) and per-operation (`debugName`) breakdowns.
+- [x] **Metric selector on the chart** — Request mode has a dropdown to plot **All
+      metrics** (default; every per-request metric overlaid, each normalized to its own
+      max), **Composition**, or a single metric in real units (input, budget %, cache
+      hit %, uncached, context growth, TTFT, latency, output, billing). Legend shows live
+      values.
 - [x] **Chart mode toggle** — Candidate (ambient gauge, streaming lines) vs Request
       (**one line per context item** over time — system prompt / tools / prompt / other —
       with dots per request and the model **budget line**; requests over budget get a red

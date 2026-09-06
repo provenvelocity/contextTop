@@ -6,6 +6,7 @@
 
 ## Completed
 
+- [x] 2026-09-06 — **Chart metric selector + all-metrics overlay** — Add a Request-mode dropdown to plot All metrics (default, each normalized to its own max), Composition, or a single per-request metric in real units (input / budget % / cache hit % / uncached / context growth / TTFT / latency / output / billing). Chart legend shows live per-metric values; picking a metric switches to Request mode.
 - [x] 2026-09-06 — **Fix F5 crash: harden engine process error handling** — Add missing `error` handlers on the engine `ChildProcess` and its stdin/stdout/stderr streams (unhandled EPIPE/ENOENT was throwing uncaught and crashing the extension host), guard writes against a dead/unwritable engine, add `export function deactivate()` to kill the engine on host reload (prevents orphan buildup across F5), and stop the engine output channel from stealing focus.
 
 - [x] 2026-09-06 — **Request chart: one line per context item + auto-switch** — Draw request mode as a colored line per source item (system prompt / tools / prompt / other) over time with per-request dots and a model budget line (red dot when over budget). Auto-switch to Request mode on the first observed request so the multi-line view is the default; manual toggle disables auto-switch.
