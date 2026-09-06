@@ -6,6 +6,8 @@
 
 ## Completed
 
+- [x] 2026-09-06 — **First wrap-up: CI + testing docs + clean baseline** — Add `.github/workflows/ci.yml` (Rust fmt/clippy `-D warnings`/test/build engine artifact, extension `npm ci`+compile, docs check), `scripts/check-docs.py` (broken-link + trailing-whitespace gate), and `docs/TESTING.md` (build/run-F5/try/CI-parity). Normalize Rust formatting and fix the `collapsible_if` clippy lint so the baseline is fmt- and clippy-clean. README gains build/run/test + repo-map links. Tag `v0.1.0` as the wrap-up point.
+
 - [x] 2026-09-06 — **Wire tool story through engine `unselect_tools` recommendation** — Correct the engine Tools rule to `execution: guided` (no API disables tools; matches PRODUCT/IPC), add `tool_unselect_is_guided` test, and have the adapter call `request.getRecommendations` and render the ranked `unselect_tools` item (engine-computed savings range, `fixId`, `targetSourceKeys`, guided) in the Story card. Remaining open: fix lifecycle events blocked on `request.reportLifecycle` in the engine binary.
 
 - [x] 2026-09-06 — **Write up the tool story (cross-referenced)** — Add `docs/TOOL_STORY.md` documenting the tool-efficiency story + per-call toggling feasibility, cross-referenced to SIGNALS/METRICS/PRODUCT/IPC/ARCHITECTURE/DASHBOARD, confirming consistency with the frozen `unselect_tools` guided-fix contract and flagging the open item (migrate adapter-side Story to an engine `getRecommendations` item).

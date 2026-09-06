@@ -13,7 +13,11 @@ pub trait TokenizerProvider {
 
 /// Conservative estimate: ~4 bytes per token, rounded up, never zero for nonempty input.
 pub fn estimate_tokens(byte_len: u64) -> u64 {
-    if byte_len == 0 { 0 } else { byte_len.div_ceil(4).max(1) }
+    if byte_len == 0 {
+        0
+    } else {
+        byte_len.div_ceil(4).max(1)
+    }
 }
 
 pub struct FallbackTokenizer;
@@ -39,7 +43,9 @@ pub struct TokenizerRegistry {
 
 impl TokenizerRegistry {
     pub fn new() -> Self {
-        Self { fallback: FallbackTokenizer }
+        Self {
+            fallback: FallbackTokenizer,
+        }
     }
 
     /// Resolve a tokenizer for the active model. v1 always returns the conservative

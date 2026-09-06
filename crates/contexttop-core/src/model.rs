@@ -180,7 +180,8 @@ impl CandidateStore {
             }
             None => true,
         };
-        self.by_source.insert(measurement.source_key.clone(), measurement);
+        self.by_source
+            .insert(measurement.source_key.clone(), measurement);
         if changed {
             self.revision += 1;
         }
@@ -223,7 +224,10 @@ impl CandidateStore {
 
     /// Sources present in the gauge whose token count could not be measured.
     pub fn unknown_source_count(&self) -> usize {
-        self.by_source.values().filter(|m| m.token_count.is_none()).count()
+        self.by_source
+            .values()
+            .filter(|m| m.token_count.is_none())
+            .count()
     }
 
     /// Remove measurements older than `cutoff_ms`. Returns the new revision.
@@ -324,10 +328,14 @@ pub enum SnapshotError {
 impl SnapshotError {
     pub fn message(&self) -> String {
         match self {
-            Self::OverlappingKeys(key) => format!("sourceKey '{key}' is both confirmed and candidate"),
+            Self::OverlappingKeys(key) => {
+                format!("sourceKey '{key}' is both confirmed and candidate")
+            }
             Self::UnknownSourceKey(key) => format!("sourceKey '{key}' was not previously ingested"),
             Self::ConfirmRequiresProvenance(key) => {
-                format!("cannot confirm sourceKey '{key}': ambient direct_api provenance is candidate-only")
+                format!(
+                    "cannot confirm sourceKey '{key}': ambient direct_api provenance is candidate-only"
+                )
             }
             Self::BudgetWithoutModel => "usableBudgetTokens requires a known modelId".to_owned(),
         }
@@ -353,8 +361,13 @@ pub fn build_request_snapshot(
 
     let mut confirmed = Vec::with_capacity(input.confirmed_source_keys.len());
     for key in input.confirmed_source_keys {
-        let measurement = store.get(key).ok_or_else(|| SnapshotError::UnknownSourceKey(key.clone()))?;
-        if !matches!(measurement.provenance, Provenance::Participant | Provenance::Diagnostic) {
+        let measurement = store
+            .get(key)
+            .ok_or_else(|| SnapshotError::UnknownSourceKey(key.clone()))?;
+        if !matches!(
+            measurement.provenance,
+            Provenance::Participant | Provenance::Diagnostic
+        ) {
             return Err(SnapshotError::ConfirmRequiresProvenance(key.clone()));
         }
         confirmed.push(snapshot_source(measurement, Inclusion::Confirmed));
@@ -362,7 +375,9 @@ pub fn build_request_snapshot(
 
     let mut candidate = Vec::with_capacity(input.candidate_source_keys.len());
     for key in input.candidate_source_keys {
-        let measurement = store.get(key).ok_or_else(|| SnapshotError::UnknownSourceKey(key.clone()))?;
+        let measurement = store
+            .get(key)
+            .ok_or_else(|| SnapshotError::UnknownSourceKey(key.clone()))?;
         candidate.push(snapshot_source(measurement, Inclusion::Candidate));
     }
 
@@ -391,7 +406,6 @@ fn snapshot_source(measurement: &SourceMeasurement, inclusion: Inclusion) -> Sna
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,7 +417,11 @@ mod tests {
             token_count: tokens,
             tokenizer_id: tokens.map(|_| "fallback-bpe".into()),
             byte_count: None,
-            measurement: if tokens.is_some() { Measurement::Estimated } else { Measurement::Unknown },
+            measurement: if tokens.is_some() {
+                Measurement::Estimated
+            } else {
+                Measurement::Unknown
+            },
             coverage: Coverage::Partial,
             provenance: Provenance::DirectApi,
             observed_at_ms: 1,
@@ -412,7 +430,12 @@ mod tests {
 
     #[test]
     fn source_kind_wire_round_trips() {
-        for kind in [SourceKind::ToolResults, SourceKind::Prompt, SourceKind::Instructions, SourceKind::Unknown] {
+        for kind in [
+            SourceKind::ToolResults,
+            SourceKind::Prompt,
+            SourceKind::Instructions,
+            SourceKind::Unknown,
+        ] {
             assert_eq!(SourceKind::from_wire(kind.as_wire()), Some(kind));
         }
         assert_eq!(SourceKind::from_wire("nope"), None);

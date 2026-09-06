@@ -99,16 +99,29 @@ fn is_absolute_path(token: &str) -> bool {
 /// tokens that follow a secret-ish label.
 fn redact_secrets_in_line(line: &str) -> String {
     let lower = line.to_ascii_lowercase();
-    let looks_secret = ["authorization", "bearer", "api_key", "apikey", "secret", "token", "password", "passwd"]
-        .iter()
-        .any(|k| lower.contains(k));
+    let looks_secret = [
+        "authorization",
+        "bearer",
+        "api_key",
+        "apikey",
+        "secret",
+        "token",
+        "password",
+        "passwd",
+    ]
+    .iter()
+    .any(|k| lower.contains(k));
     if !looks_secret {
         return line.to_owned();
     }
     // Replace the value after a `:` or `=` on a secret-labeled line.
     if let Some(pos) = line.find(['=', ':']) {
         let (head, tail) = line.split_at(pos + 1);
-        let trailing_ws: String = tail.chars().rev().take_while(|c| c.is_whitespace()).collect();
+        let trailing_ws: String = tail
+            .chars()
+            .rev()
+            .take_while(|c| c.is_whitespace())
+            .collect();
         let mut redacted = String::with_capacity(line.len());
         redacted.push_str(head);
         if !tail.trim().is_empty() {
@@ -125,7 +138,11 @@ fn redact_secrets_in_line(line: &str) -> String {
 fn split_keep_delims(input: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut start = 0;
-    let mut in_ws = input.chars().next().map(|c| c.is_whitespace()).unwrap_or(false);
+    let mut in_ws = input
+        .chars()
+        .next()
+        .map(|c| c.is_whitespace())
+        .unwrap_or(false);
     for (i, c) in input.char_indices() {
         let ws = c.is_whitespace();
         if ws != in_ws {

@@ -10,22 +10,21 @@ use std::io::{self, BufReader, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use contexttop_core::model::{
-    build_request_snapshot, CandidateStore, Coverage, Measurement, Provenance, RecordRequestInput,
-    RequestSnapshot, SourceKind, SourceMeasurement,
+    CandidateStore, Coverage, Measurement, Provenance, RecordRequestInput, RequestSnapshot,
+    SourceKind, SourceMeasurement, build_request_snapshot,
 };
 use contexttop_core::protocol::{
-    accept_hello, Envelope, ErrorCode, ErrorPayload, GetTimelineRequest, GetRecommendationsRequest,
-    IngestObservationRequest, IngestObservationResponse,
-    RecordRequestSnapshotRequest, RecordRequestSnapshotResponse, RecommendationItem,
-    RecommendationsResponse, SetConfigRequest, SetConfigResponse, SubscribeMetricsRequest,
-    SubscribeMetricsResponse, TimelineResponse, Rejection, MAX_MESSAGE_BYTES, PROTOCOL_VERSION,
-    MetricBucketView,
+    Envelope, ErrorCode, ErrorPayload, GetRecommendationsRequest, GetTimelineRequest,
+    IngestObservationRequest, IngestObservationResponse, MAX_MESSAGE_BYTES, MetricBucketView,
+    PROTOCOL_VERSION, RecommendationItem, RecommendationsResponse, RecordRequestSnapshotRequest,
+    RecordRequestSnapshotResponse, Rejection, SetConfigRequest, SetConfigResponse,
+    SubscribeMetricsRequest, SubscribeMetricsResponse, TimelineResponse, accept_hello,
 };
-use contexttop_core::recommend::{rank, RankInput};
+use contexttop_core::recommend::{RankInput, rank};
 use contexttop_core::redaction::Redactor;
 use contexttop_core::source_key::SessionKey;
-use contexttop_core::tokenizer::{TokenizerRegistry, FALLBACK_ID};
-use serde_json::{json, Value};
+use contexttop_core::tokenizer::{FALLBACK_ID, TokenizerRegistry};
+use serde_json::{Value, json};
 use ulid::Ulid;
 
 const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -88,7 +87,12 @@ impl EngineState {
 
     /// Derive a `sourceKey`, tokenize/estimate, and update the candidate gauge. Returns the
     /// wire response. Never confirms inclusion.
-    fn ingest(&mut self, kind: SourceKind, req: &IngestObservationRequest, ts: u64) -> IngestObservationResponse {
+    fn ingest(
+        &mut self,
+        kind: SourceKind,
+        req: &IngestObservationRequest,
+        ts: u64,
+    ) -> IngestObservationResponse {
         let source_key = self.key.derive(&req.source_identity);
         let (token_count, measurement, tokenizer_id) = self.derive_tokens(req);
         let byte_count = req.observed.as_ref().and_then(|o| o.byte_len);
@@ -137,7 +141,10 @@ impl EngineState {
     /// Derive the token count and its measurement label. A directly-reported token count
     /// is `observed`; content or a byte count yields an `estimated` count via the fallback
     /// tokenizer; no basis yields `unknown`.
-    fn derive_tokens(&self, req: &IngestObservationRequest) -> (Option<u64>, Measurement, Option<String>) {
+    fn derive_tokens(
+        &self,
+        req: &IngestObservationRequest,
+    ) -> (Option<u64>, Measurement, Option<String>) {
         // A validated source (e.g. diagnostic usage line) may report tokens directly.
         if let Some(token_count) = req.observed.as_ref().and_then(|o| o.token_count) {
             return (Some(token_count), Measurement::Observed, None);
@@ -146,22 +153,40 @@ impl EngineState {
         if let Some(content) = req.transient_content.as_deref().filter(|c| !c.is_empty()) {
             // Redact before tokenizing so no secret/path could reach any later detail tier.
             let redacted = self.redactor.redact(content);
-            return (Some(tokenizer.count_text(&redacted)), Measurement::Estimated, Some(FALLBACK_ID.to_owned()));
+            return (
+                Some(tokenizer.count_text(&redacted)),
+                Measurement::Estimated,
+                Some(FALLBACK_ID.to_owned()),
+            );
         }
         if let Some(byte_len) = req.observed.as_ref().and_then(|o| o.byte_len) {
-            return (Some(tokenizer.count_bytes(byte_len)), Measurement::Estimated, Some(FALLBACK_ID.to_owned()));
+            return (
+                Some(tokenizer.count_bytes(byte_len)),
+                Measurement::Estimated,
+                Some(FALLBACK_ID.to_owned()),
+            );
         }
         (None, Measurement::Unknown, None)
     }
 
     /// Record an immutable request snapshot. A duplicate `requestId` is a protocol error;
     /// snapshots are never mutated after creation.
-    fn record_snapshot(&mut self, req: &RecordRequestSnapshotRequest) -> Result<RecordRequestSnapshotResponse, Rejection> {
+    fn record_snapshot(
+        &mut self,
+        req: &RecordRequestSnapshotRequest,
+    ) -> Result<RecordRequestSnapshotResponse, Rejection> {
         if self.snapshots.contains_key(&req.request_id) {
-            return Err(Rejection::new(ErrorCode::Protocol, format!("request snapshot '{}' already recorded", req.request_id)));
+            return Err(Rejection::new(
+                ErrorCode::Protocol,
+                format!("request snapshot '{}' already recorded", req.request_id),
+            ));
         }
-        let provenance = Provenance::from_wire(&req.provenance)
-            .ok_or_else(|| Rejection::new(ErrorCode::BadRequest, format!("unknown provenance '{}'", req.provenance)))?;
+        let provenance = Provenance::from_wire(&req.provenance).ok_or_else(|| {
+            Rejection::new(
+                ErrorCode::BadRequest,
+                format!("unknown provenance '{}'", req.provenance),
+            )
+        })?;
 
         let seq = self.next_seq;
         let input = RecordRequestInput {
@@ -179,19 +204,29 @@ impl EngineState {
 
         self.next_seq += 1;
         self.snapshots.insert(req.request_id.clone(), snapshot);
-        Ok(RecordRequestSnapshotResponse { request_id: req.request_id.clone(), recorded: true, request_sent_seq: seq })
+        Ok(RecordRequestSnapshotResponse {
+            request_id: req.request_id.clone(),
+            recorded: true,
+            request_sent_seq: seq,
+        })
     }
 
     /// Rank current candidate pressure, or a recorded request snapshot when `requestId` is
     /// given. Ranking only; the engine never applies a fix. Proposal identity is memoized so
     /// repeated reads return the same `fixId`.
-    fn get_recommendations(&mut self, req: &GetRecommendationsRequest) -> Result<RecommendationsResponse, Rejection> {
-        let (inputs, basis_request_id, basis_candidate_revision, basis_key) = match &req.request_id {
+    fn get_recommendations(
+        &mut self,
+        req: &GetRecommendationsRequest,
+    ) -> Result<RecommendationsResponse, Rejection> {
+        let (inputs, basis_request_id, basis_candidate_revision, basis_key) = match &req.request_id
+        {
             Some(request_id) => {
-                let snapshot = self
-                    .snapshots
-                    .get(request_id)
-                    .ok_or_else(|| Rejection::new(ErrorCode::BadRequest, format!("unknown requestId '{request_id}'")))?;
+                let snapshot = self.snapshots.get(request_id).ok_or_else(|| {
+                    Rejection::new(
+                        ErrorCode::BadRequest,
+                        format!("unknown requestId '{request_id}'"),
+                    )
+                })?;
                 let inputs = snapshot
                     .confirmed
                     .iter()
@@ -203,7 +238,12 @@ impl EngineState {
                         measurement: source.measurement,
                     })
                     .collect::<Vec<_>>();
-                (inputs, Some(request_id.clone()), None, format!("req:{request_id}"))
+                (
+                    inputs,
+                    Some(request_id.clone()),
+                    None,
+                    format!("req:{request_id}"),
+                )
             }
             None => {
                 let revision = self.candidates.revision();
@@ -268,16 +308,16 @@ impl EngineState {
 
         // For now, emit one current bucket with the latest candidate state.
         // A real implementation would maintain a history of buckets per time window.
-        let candidate_by_source = self
-            .candidates
-            .iter()
-            .fold(BTreeMap::new(), |mut map, measurement| {
-                let kind_str = measurement.source_kind.as_wire().to_owned();
-                if let Some(tokens) = measurement.token_count {
-                    *map.entry(kind_str).or_insert(0) += tokens;
-                }
-                map
-            });
+        let candidate_by_source =
+            self.candidates
+                .iter()
+                .fold(BTreeMap::new(), |mut map, measurement| {
+                    let kind_str = measurement.source_kind.as_wire().to_owned();
+                    if let Some(tokens) = measurement.token_count {
+                        *map.entry(kind_str).or_insert(0) += tokens;
+                    }
+                    map
+                });
 
         let candidate_total: u64 = candidate_by_source.values().sum();
 
@@ -296,7 +336,9 @@ impl EngineState {
             candidate_by_source_latest: candidate_by_source,
             max_request_confirmed_tokens: self.snapshots.values().fold(None, |max, snap| {
                 let confirmed = snap.confirmed_tokens();
-                Some(max.map_or(confirmed.unwrap_or(0), |m: u64| m.max(confirmed.unwrap_or(0))))
+                Some(max.map_or(confirmed.unwrap_or(0), |m: u64| {
+                    m.max(confirmed.unwrap_or(0))
+                }))
             }),
             max_request_id: self.snapshots.iter().next().map(|(id, _)| id.clone()),
             request_count: self.snapshots.len(),
@@ -307,14 +349,21 @@ impl EngineState {
 
         buckets.push(bucket);
 
-        Ok(TimelineResponse { cursor: self.event_seq, bucket_ms: req.bucket_ms, buckets })
+        Ok(TimelineResponse {
+            cursor: self.event_seq,
+            bucket_ms: req.bucket_ms,
+            buckets,
+        })
     }
 
     /// Subscribe to the metrics event stream. `afterSeq` resumes; `null` gives a fresh
     /// snapshot. Returns the correlated response; callers should emit live events afterward.
-    fn subscribe_metrics(&mut self, _req: &SubscribeMetricsRequest) -> Result<SubscribeMetricsResponse, Rejection> {
+    fn subscribe_metrics(
+        &mut self,
+        _req: &SubscribeMetricsRequest,
+    ) -> Result<SubscribeMetricsResponse, Rejection> {
         let cursor = self.event_seq;
-        
+
         // For now, always use snapshot mode (simplified; v1 does not buffer events yet).
         let timeline = self.get_timeline(&GetTimelineRequest {
             session_id: self.session_id.clone(),
@@ -335,16 +384,16 @@ impl EngineState {
     /// Generate a metrics event with the current candidate state.
     fn make_metrics_event(&self) -> Value {
         let now = now_ms();
-        let candidate_by_source = self
-            .candidates
-            .iter()
-            .fold(BTreeMap::new(), |mut map, measurement| {
-                let kind_str = measurement.source_kind.as_wire().to_owned();
-                if let Some(tokens) = measurement.token_count {
-                    *map.entry(kind_str).or_insert(0) += tokens;
-                }
-                map
-            });
+        let candidate_by_source =
+            self.candidates
+                .iter()
+                .fold(BTreeMap::new(), |mut map, measurement| {
+                    let kind_str = measurement.source_kind.as_wire().to_owned();
+                    if let Some(tokens) = measurement.token_count {
+                        *map.entry(kind_str).or_insert(0) += tokens;
+                    }
+                    map
+                });
 
         let candidate_total: u64 = candidate_by_source.values().sum();
 
@@ -380,7 +429,12 @@ fn run<R: Read, W: Write>(reader: &mut BufReader<R>, writer: &mut W) -> io::Resu
     let mut state = match read_message(reader)? {
         ReadOutcome::Eof => return Ok(()),
         ReadOutcome::TooLarge => {
-            send_error(writer, None, ErrorCode::TooLarge, "message exceeds 1 MiB envelope limit")?;
+            send_error(
+                writer,
+                None,
+                ErrorCode::TooLarge,
+                "message exceeds 1 MiB envelope limit",
+            )?;
             return Ok(());
         }
         ReadOutcome::Message(bytes) => match parse_envelope(&bytes) {
@@ -396,11 +450,21 @@ fn run<R: Read, W: Write>(reader: &mut BufReader<R>, writer: &mut W) -> io::Resu
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_owned();
-                    send(writer, "response.hello", envelope.id.clone(), serde_json::to_value(&response).unwrap())?;
+                    send(
+                        writer,
+                        "response.hello",
+                        envelope.id.clone(),
+                        serde_json::to_value(&response).unwrap(),
+                    )?;
                     EngineState::new(session_id)
                 }
                 Err(rejection) => {
-                    send_error(writer, envelope.id.clone(), rejection.code, rejection.message)?;
+                    send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?;
                     return Ok(());
                 }
             },
@@ -412,7 +476,12 @@ fn run<R: Read, W: Write>(reader: &mut BufReader<R>, writer: &mut W) -> io::Resu
         match read_message(reader)? {
             ReadOutcome::Eof => return Ok(()),
             ReadOutcome::TooLarge => {
-                send_error(writer, None, ErrorCode::TooLarge, "message exceeds 1 MiB envelope limit")?;
+                send_error(
+                    writer,
+                    None,
+                    ErrorCode::TooLarge,
+                    "message exceeds 1 MiB envelope limit",
+                )?;
             }
             ReadOutcome::Message(bytes) => {
                 let envelope = match parse_envelope(&bytes) {
@@ -431,7 +500,11 @@ fn run<R: Read, W: Write>(reader: &mut BufReader<R>, writer: &mut W) -> io::Resu
 }
 
 /// Returns `Ok(true)` when the host should shut down.
-fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineState) -> io::Result<bool> {
+fn dispatch<W: Write>(
+    writer: &mut W,
+    envelope: &Envelope,
+    state: &mut EngineState,
+) -> io::Result<bool> {
     if envelope.v != PROTOCOL_VERSION {
         send_error(
             writer,
@@ -443,11 +516,16 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
     }
 
     // Every post-hello message carrying `sessionId` must match the hello session.
-    if let Some(incoming) = envelope.payload.get("sessionId").and_then(Value::as_str) {
-        if incoming != state.session_id {
-            send_error(writer, envelope.id.clone(), ErrorCode::Protocol, "sessionId does not match hello session")?;
-            return Ok(false);
-        }
+    if let Some(incoming) = envelope.payload.get("sessionId").and_then(Value::as_str)
+        && incoming != state.session_id
+    {
+        send_error(
+            writer,
+            envelope.id.clone(),
+            ErrorCode::Protocol,
+            "sessionId does not match hello session",
+        )?;
+        return Ok(false);
     }
 
     match envelope.msg_type.as_str() {
@@ -468,7 +546,12 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                     )?,
                     Some(kind) => {
                         let response = state.ingest(kind, &req, envelope.ts);
-                        send(writer, "response.ingestObservation", envelope.id.clone(), serde_json::to_value(response).unwrap())?;
+                        send(
+                            writer,
+                            "response.ingestObservation",
+                            envelope.id.clone(),
+                            serde_json::to_value(response).unwrap(),
+                        )?;
 
                         // Emit a metrics event after ingesting so the UI streams live.
                         state.event_seq += 1;
@@ -494,7 +577,12 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                         envelope.id.clone(),
                         serde_json::to_value(response).unwrap(),
                     )?,
-                    Err(rejection) => send_error(writer, envelope.id.clone(), rejection.code, rejection.message)?,
+                    Err(rejection) => send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?,
                 },
             }
             Ok(false)
@@ -514,7 +602,12 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                         envelope.id.clone(),
                         serde_json::to_value(response).unwrap(),
                     )?,
-                    Err(rejection) => send_error(writer, envelope.id.clone(), rejection.code, rejection.message)?,
+                    Err(rejection) => send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?,
                 },
             }
             Ok(false)
@@ -534,7 +627,12 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                         envelope.id.clone(),
                         serde_json::to_value(response).unwrap(),
                     )?,
-                    Err(rejection) => send_error(writer, envelope.id.clone(), rejection.code, rejection.message)?,
+                    Err(rejection) => send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?,
                 },
             }
             Ok(false)
@@ -554,7 +652,12 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                         envelope.id.clone(),
                         serde_json::to_value(response).unwrap(),
                     )?,
-                    Err(rejection) => send_error(writer, envelope.id.clone(), rejection.code, rejection.message)?,
+                    Err(rejection) => send_error(
+                        writer,
+                        envelope.id.clone(),
+                        rejection.code,
+                        rejection.message,
+                    )?,
                 },
             }
             Ok(false)
@@ -569,17 +672,32 @@ fn dispatch<W: Write>(writer: &mut W, envelope: &Envelope, state: &mut EngineSta
                 )?,
                 Ok(req) => {
                     let response = state.set_config(&req);
-                    send(writer, "response.setConfig", envelope.id.clone(), serde_json::to_value(response).unwrap())?;
+                    send(
+                        writer,
+                        "response.setConfig",
+                        envelope.id.clone(),
+                        serde_json::to_value(response).unwrap(),
+                    )?;
                 }
             }
             Ok(false)
         }
         "request.shutdown" => {
-            send(writer, "response.shutdown", envelope.id.clone(), json!({ "ok": true }))?;
+            send(
+                writer,
+                "response.shutdown",
+                envelope.id.clone(),
+                json!({ "ok": true }),
+            )?;
             Ok(true)
         }
         "request.hello" => {
-            send_error(writer, envelope.id.clone(), ErrorCode::Protocol, "handshake already completed")?;
+            send_error(
+                writer,
+                envelope.id.clone(),
+                ErrorCode::Protocol,
+                "handshake already completed",
+            )?;
             Ok(false)
         }
         other if other.starts_with("request.") => {
@@ -601,7 +719,12 @@ fn parse_envelope(bytes: &[u8]) -> Result<Envelope, Rejection> {
         .map_err(|err| Rejection::new(ErrorCode::BadRequest, format!("malformed message: {err}")))
 }
 
-fn send<W: Write>(writer: &mut W, msg_type: &str, id: Option<String>, payload: Value) -> io::Result<()> {
+fn send<W: Write>(
+    writer: &mut W,
+    msg_type: &str,
+    id: Option<String>,
+    payload: Value,
+) -> io::Result<()> {
     let envelope = Envelope::new(msg_type, id, now_ms(), payload);
     let line = serde_json::to_string(&envelope).expect("envelope serializes");
     writer.write_all(line.as_bytes())?;
@@ -615,12 +738,23 @@ fn send_error<W: Write>(
     code: ErrorCode,
     message: impl Into<String>,
 ) -> io::Result<()> {
-    let payload = ErrorPayload { code: code.as_str().to_owned(), message: message.into() };
-    send(writer, &code.message_type(), id, serde_json::to_value(payload).unwrap())
+    let payload = ErrorPayload {
+        code: code.as_str().to_owned(),
+        message: message.into(),
+    };
+    send(
+        writer,
+        &code.message_type(),
+        id,
+        serde_json::to_value(payload).unwrap(),
+    )
 }
 
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn read_message<R: Read>(reader: &mut BufReader<R>) -> io::Result<ReadOutcome> {
@@ -634,7 +768,11 @@ fn read_line_bounded<R: Read>(reader: &mut R, max: usize) -> io::Result<ReadOutc
     loop {
         let read = reader.read(&mut byte)?;
         if read == 0 {
-            return Ok(if buf.is_empty() { ReadOutcome::Eof } else { ReadOutcome::Message(buf) });
+            return Ok(if buf.is_empty() {
+                ReadOutcome::Eof
+            } else {
+                ReadOutcome::Message(buf)
+            });
         }
         if byte[0] == b'\n' {
             return Ok(ReadOutcome::Message(buf));
@@ -668,7 +806,8 @@ mod tests {
     #[test]
     fn completes_handshake_then_shuts_down() {
         let hello = r#"{"v":1,"id":"01H","type":"request.hello","ts":1,"payload":{"nonce":"n","adapterVersion":"0.1.0","sessionId":"S1","capabilities":["signals.editor"]}}"#;
-        let shutdown = r#"{"v":1,"id":"02H","type":"request.shutdown","ts":2,"payload":{"sessionId":"S1"}}"#;
+        let shutdown =
+            r#"{"v":1,"id":"02H","type":"request.shutdown","ts":2,"payload":{"sessionId":"S1"}}"#;
         let out = drive(&format!("{hello}\n{shutdown}\n"));
 
         let lines: Vec<&str> = out.lines().collect();
@@ -680,7 +819,9 @@ mod tests {
 
     #[test]
     fn rejects_non_hello_first_message() {
-        let out = drive("{\"v\":1,\"id\":\"01H\",\"type\":\"request.getTimeline\",\"ts\":1,\"payload\":{}}\n");
+        let out = drive(
+            "{\"v\":1,\"id\":\"01H\",\"type\":\"request.getTimeline\",\"ts\":1,\"payload\":{}}\n",
+        );
         assert!(out.contains("\"type\":\"error.protocol\""));
     }
 
@@ -714,7 +855,12 @@ mod tests {
         let hello = r#"{"v":1,"id":"01H","type":"request.hello","ts":1,"payload":{"nonce":"n","adapterVersion":"0.1.0","sessionId":"S1","capabilities":[]}}"#;
         let ingest = r#"{"v":1,"id":"02H","type":"request.ingestObservation","ts":2,"payload":{"sessionId":"S1","sourceIdentity":"x","sourceKind":"bogus","measurement":"observed"}}"#;
         let out = drive(&format!("{hello}\n{ingest}\n"));
-        assert!(out.lines().nth(1).unwrap().contains("\"type\":\"error.badRequest\""));
+        assert!(
+            out.lines()
+                .nth(1)
+                .unwrap()
+                .contains("\"type\":\"error.badRequest\"")
+        );
     }
 
     fn fixed_state() -> EngineState {
@@ -727,16 +873,21 @@ mod tests {
         assert_eq!(state.policy_revision, 1);
         let cfg = serde_json::json!({ "warningThreshold": 0.7, "captureLevel": "metadata" });
         let req: SetConfigRequest =
-            serde_json::from_value(serde_json::json!({ "sessionId": "S1", "config": cfg })).unwrap();
+            serde_json::from_value(serde_json::json!({ "sessionId": "S1", "config": cfg }))
+                .unwrap();
         let r1 = state.set_config(&req);
         assert_eq!(r1.policy_revision, 2, "first config change bumps revision");
         // Same config again → no bump.
         let r2 = state.set_config(&req);
-        assert_eq!(r2.policy_revision, 2, "unchanged config keeps revision stable");
+        assert_eq!(
+            r2.policy_revision, 2,
+            "unchanged config keeps revision stable"
+        );
         // Different config → bump.
         let cfg2 = serde_json::json!({ "warningThreshold": 0.9 });
         let req2: SetConfigRequest =
-            serde_json::from_value(serde_json::json!({ "sessionId": "S1", "config": cfg2 })).unwrap();
+            serde_json::from_value(serde_json::json!({ "sessionId": "S1", "config": cfg2 }))
+                .unwrap();
         let r3 = state.set_config(&req2);
         assert_eq!(r3.policy_revision, 3);
         assert_eq!(r3.effective_config, cfg2);
@@ -811,7 +962,10 @@ mod tests {
             "provenance": "participant"
         }));
         assert!(state.record_snapshot(&req).is_ok());
-        assert_eq!(state.record_snapshot(&req).unwrap_err().code, ErrorCode::Protocol);
+        assert_eq!(
+            state.record_snapshot(&req).unwrap_err().code,
+            ErrorCode::Protocol
+        );
     }
 
     fn recommendations_req(value: serde_json::Value) -> GetRecommendationsRequest {
@@ -844,8 +998,13 @@ mod tests {
     #[test]
     fn recommendations_for_unknown_request_id_is_bad_request() {
         let mut state = fixed_state();
-        let req = recommendations_req(serde_json::json!({ "sessionId": "S1", "requestId": "does-not-exist" }));
-        assert_eq!(state.get_recommendations(&req).unwrap_err().code, ErrorCode::BadRequest);
+        let req = recommendations_req(
+            serde_json::json!({ "sessionId": "S1", "requestId": "does-not-exist" }),
+        );
+        assert_eq!(
+            state.get_recommendations(&req).unwrap_err().code,
+            ErrorCode::BadRequest
+        );
     }
 
     #[test]
@@ -866,7 +1025,10 @@ mod tests {
     #[test]
     fn oversized_line_is_too_large() {
         let mut reader = Cursor::new(vec![b'a'; 32]);
-        matches!(read_line_bounded(&mut reader, 8).unwrap(), ReadOutcome::TooLarge);
+        matches!(
+            read_line_bounded(&mut reader, 8).unwrap(),
+            ReadOutcome::TooLarge
+        );
     }
 
     #[test]

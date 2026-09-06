@@ -14,7 +14,35 @@ The first surface is a VS Code bottom-panel view, beside Terminal. The durable p
 - [`docs/SIGNALS.md`](docs/SIGNALS.md) — signal capability matrix, tokenizer strategy, and opt-in tiers.
 - [`docs/IPC.md`](docs/IPC.md) — versioned local IPC protocol between the VS Code adapter and the Rust engine.
 - [`docs/METRICS.md`](docs/METRICS.md) — snapshot semantics, collection pipeline, bounded retention, streaming, and chart behavior.
+- [`docs/DASHBOARD.md`](docs/DASHBOARD.md) — dashboard metrics, sidecar decomposition, and the extensible card model.
+- [`docs/TOOL_STORY.md`](docs/TOOL_STORY.md) — the tool-efficiency story and per-call tool-toggling feasibility.
 - [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — milestones, proof points, and acceptance criteria.
+- [`docs/TESTING.md`](docs/TESTING.md) — build, run (F5), and try contextTop end to end.
+
+## Build, run, and test
+
+Prerequisites: Rust stable (1.85+, edition 2024), Node.js 20+, VS Code 1.96+, and GitHub
+Copilot Chat signed in. Full instructions are in [`docs/TESTING.md`](docs/TESTING.md).
+
+```bash
+cargo build --bin engine                 # build the engine the extension spawns
+cd apps/vscode && npm ci && npm run compile   # build the extension
+```
+
+Then open the repo in VS Code and press **F5** to launch the Extension Development Host,
+and open the **contextTop** panel.
+
+Continuous integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the
+same checks on every push and pull request:
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cd apps/vscode && npm ci && npm run compile
+python scripts/check-docs.py
+```
+
 
 ## Product rule
 

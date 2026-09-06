@@ -123,9 +123,15 @@ pub fn rank(inputs: &[RankInput], min_tokens: u64) -> Vec<Recommendation> {
         if tokens < min_tokens {
             continue;
         }
-        let mut target_source_keys: Vec<String> = matching.iter().map(|input| input.source_key.clone()).collect();
+        let mut target_source_keys: Vec<String> = matching
+            .iter()
+            .map(|input| input.source_key.clone())
+            .collect();
         target_source_keys.sort();
-        let measurement = if matching.iter().all(|input| input.measurement == Measurement::Observed) {
+        let measurement = if matching
+            .iter()
+            .all(|input| input.measurement == Measurement::Observed)
+        {
             Measurement::Observed
         } else {
             Measurement::Estimated
@@ -143,7 +149,10 @@ pub fn rank(inputs: &[RankInput], min_tokens: u64) -> Vec<Recommendation> {
             execution: rule.execution,
         });
     }
-    proposals.sort_by(|a, b| b.estimated_tokens_saved_max.cmp(&a.estimated_tokens_saved_max));
+    proposals.sort_by(|a, b| {
+        b.estimated_tokens_saved_max
+            .cmp(&a.estimated_tokens_saved_max)
+    });
     proposals
 }
 
@@ -152,13 +161,21 @@ mod tests {
     use super::*;
 
     fn input(key: &str, kind: SourceKind, tokens: u64) -> RankInput {
-        RankInput { source_key: key.into(), source_kind: kind, token_count: Some(tokens), measurement: Measurement::Estimated }
+        RankInput {
+            source_key: key.into(),
+            source_kind: kind,
+            token_count: Some(tokens),
+            measurement: Measurement::Estimated,
+        }
     }
 
     #[test]
     fn proposes_only_for_kinds_over_threshold() {
         let recs = rank(
-            &[input("t1", SourceKind::Terminal, 4_000), input("p1", SourceKind::Prompt, 200)],
+            &[
+                input("t1", SourceKind::Terminal, 4_000),
+                input("p1", SourceKind::Prompt, 200),
+            ],
             1_000,
         );
         assert_eq!(recs.len(), 1);
@@ -170,18 +187,27 @@ mod tests {
     #[test]
     fn aggregates_multiple_sources_of_one_kind_and_sorts_target_keys() {
         let recs = rank(
-            &[input("f2", SourceKind::Files, 600), input("f1", SourceKind::Files, 700)],
+            &[
+                input("f2", SourceKind::Files, 600),
+                input("f1", SourceKind::Files, 700),
+            ],
             1_000,
         );
         assert_eq!(recs.len(), 1);
-        assert_eq!(recs[0].target_source_keys, vec!["f1".to_owned(), "f2".to_owned()]);
+        assert_eq!(
+            recs[0].target_source_keys,
+            vec!["f1".to_owned(), "f2".to_owned()]
+        );
         assert_eq!(recs[0].execution, Execution::Executable);
     }
 
     #[test]
     fn orders_by_descending_estimated_savings() {
         let recs = rank(
-            &[input("t1", SourceKind::Terminal, 2_000), input("h1", SourceKind::History, 8_000)],
+            &[
+                input("t1", SourceKind::Terminal, 2_000),
+                input("h1", SourceKind::History, 8_000),
+            ],
             1_000,
         );
         assert_eq!(recs[0].action_kind, ActionKind::StartCleanChat);

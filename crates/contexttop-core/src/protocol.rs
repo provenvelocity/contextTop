@@ -26,7 +26,13 @@ pub struct Envelope {
 impl Envelope {
     /// Build a response/error envelope that echoes the offending request `id` when known.
     pub fn new(msg_type: impl Into<String>, id: Option<String>, ts: u64, payload: Value) -> Self {
-        Self { v: PROTOCOL_VERSION, id, msg_type: msg_type.into(), ts, payload }
+        Self {
+            v: PROTOCOL_VERSION,
+            id,
+            msg_type: msg_type.into(),
+            ts,
+            payload,
+        }
     }
 }
 
@@ -310,7 +316,10 @@ pub struct Rejection {
 
 impl Rejection {
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
-        Self { code, message: message.into() }
+        Self {
+            code,
+            message: message.into(),
+        }
     }
 }
 
@@ -331,7 +340,11 @@ pub fn engine_capabilities() -> Vec<String> {
 /// Effective capabilities are the intersection of adapter and engine sets, preserving the
 /// engine's ordering.
 pub fn intersect_capabilities(adapter: &[String], engine: &[String]) -> Vec<String> {
-    engine.iter().filter(|cap| adapter.contains(cap)).cloned().collect()
+    engine
+        .iter()
+        .filter(|cap| adapter.contains(cap))
+        .cloned()
+        .collect()
 }
 
 /// Validate the first message and produce the `response.hello` body. No other request is
@@ -349,8 +362,12 @@ pub fn accept_hello(envelope: &Envelope, engine_version: &str) -> Result<HelloRe
             "handshake required before any other request",
         ));
     }
-    let hello: HelloRequest = serde_json::from_value(envelope.payload.clone())
-        .map_err(|err| Rejection::new(ErrorCode::BadRequest, format!("invalid hello payload: {err}")))?;
+    let hello: HelloRequest = serde_json::from_value(envelope.payload.clone()).map_err(|err| {
+        Rejection::new(
+            ErrorCode::BadRequest,
+            format!("invalid hello payload: {err}"),
+        )
+    })?;
 
     Ok(HelloResponse {
         engine_version: engine_version.to_owned(),
@@ -394,7 +411,11 @@ mod tests {
         let response = accept_hello(&hello_envelope(1), "0.1.0").unwrap();
         assert_eq!(response.nonce, "nonce-123");
         assert_eq!(response.engine_version, "0.1.0");
-        assert!(response.capabilities.contains(&"tokenizer.registry".to_owned()));
+        assert!(
+            response
+                .capabilities
+                .contains(&"tokenizer.registry".to_owned())
+        );
     }
 
     #[test]
@@ -427,7 +448,13 @@ mod tests {
             "diagnostics.copilotTrace".to_owned(),
         ];
         let effective = intersect_capabilities(&adapter, &engine_capabilities());
-        assert_eq!(effective, vec!["signals.editor".to_owned(), "signals.participant".to_owned()]);
+        assert_eq!(
+            effective,
+            vec![
+                "signals.editor".to_owned(),
+                "signals.participant".to_owned()
+            ]
+        );
     }
 
     #[test]
