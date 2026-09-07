@@ -30,16 +30,23 @@ if [[ -z "$MSG" ]]; then
     }
   ' TASKS.md)"
   if [[ -z "$TODOS" ]]; then
-    echo "no message given and no ## In Progress items to derive one from" >&2
-    exit 1
-  fi
-  SUBJECT="$(printf '%s\n' "$TODOS" | head -1)"
-  if [[ "$(printf '%s\n' "$TODOS" | grep -c .)" -gt 1 ]]; then
-    MSG="$SUBJECT"$'\n\n'"$(printf '%s\n' "$TODOS" | sed 's/^/- /')"
+    # No todos either: summarize the changed files so a message is never required.
+    CHANGED="$(git status --porcelain | sed 's/^...//' | head -5 | paste -sd, -)"
+    if [[ -z "$CHANGED" ]]; then
+      echo "nothing to commit"
+      exit 0
+    fi
+    MSG="chore: update ${CHANGED}"
+    echo "message from changes: ${MSG}"
   else
-    MSG="$SUBJECT"
+    SUBJECT="$(printf '%s\n' "$TODOS" | head -1)"
+    if [[ "$(printf '%s\n' "$TODOS" | grep -c .)" -gt 1 ]]; then
+      MSG="$SUBJECT"$'\n\n'"$(printf '%s\n' "$TODOS" | sed 's/^/- /')"
+    else
+      MSG="$SUBJECT"
+    fi
+    echo "message from TODO: ${SUBJECT}"
   fi
-  echo "message from TODO: ${SUBJECT}"
 fi
 
 DATE="$(date +%F)"
