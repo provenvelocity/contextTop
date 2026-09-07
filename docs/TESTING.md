@@ -96,18 +96,21 @@ so end users install and run without a source checkout.
 
 Get one from:
 
-- the latest [Release](https://github.com/provenvelocity/contextTop/releases), or
-- a green CI run's **artifacts** (`contexttop-<platform>-vsix`).
+- the latest [Release](https://github.com/provenvelocity/contextTop/releases) — the
+  `contexttop-<platform>.vsix` is attached directly, or
+- a green [CI run](https://github.com/provenvelocity/contextTop/actions)'s **artifacts**
+  (`contexttop-<platform>-vsix`) — download and unzip (Actions wraps artifacts in a `.zip`).
 
-Then install:
+Pick the platform matching your machine: `darwin-arm64` (Apple Silicon Mac), `darwin-x64`
+(Intel Mac), `linux-x64` (Linux), `win32-x64` (Windows). Then install and run:
 
 ```bash
 code --install-extension contexttop-<platform>.vsix
-# platforms: darwin-arm64 | darwin-x64 | linux-x64 | win32-x64
 ```
 
-Or: Extensions view → `⋯` → *Install from VSIX…*. Open the **contextTop** panel from the
-bottom Panel area.
+Or: Extensions view → `⋯` → *Install from VSIX…*. Reload VS Code, open the **contextTop**
+panel from the bottom Panel area, and use Copilot Chat — the engine is bundled, so there
+is no extra setup. Requires GitHub Copilot Chat installed and signed in.
 
 To build a `.vsix` locally (host platform):
 

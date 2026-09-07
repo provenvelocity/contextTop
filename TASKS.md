@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-07 — ci: cross-compile darwin-x64 on macos-14 (drop stuck macos-13 runner); clearer install docs
 - [x] 2026-09-07 — push.sh: no-arg mode always auto-generates a message (In Progress todos, else changed-file summary)
 - [x] 2026-09-07 — push.sh: derive commit message from In Progress TODO statements when no message is given
 - [x] 2026-09-07 — chore: add push.sh (commit+TODO update+push as one unit) and TODO commit instruction

@@ -16,28 +16,34 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux-x64
+            rust: x86_64-unknown-linux-gnu
             engine: engine
           - os: macos-14
             target: darwin-arm64
+            rust: aarch64-apple-darwin
             engine: engine
-          - os: macos-13
+          - os: macos-14
             target: darwin-x64
+            rust: x86_64-apple-darwin
             engine: engine
           - os: windows-latest
             target: win32-x64
+            rust: x86_64-pc-windows-msvc
             engine: engine.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
       - name: Build engine (release)
-        run: cargo build --release --bin engine
+        run: cargo build --release --bin engine --target ${{ matrix.rust }}
       - name: Bundle engine into the extension
         shell: bash
         run: |
           mkdir -p apps/vscode/bin
-          cp "target/release/${{ matrix.engine }}" "apps/vscode/bin/${{ matrix.engine }}"
+          cp "target/${{ matrix.rust }}/release/${{ matrix.engine }}" "apps/vscode/bin/${{ matrix.engine }}"
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -54,7 +60,7 @@ jobs:
         run: |
           mkdir -p dist
           cp "apps/vscode/contexttop-${{ matrix.target }}.vsix" "dist/"
-          cp "target/release/${{ matrix.engine }}" "dist/engine-${{ matrix.target }}${{ matrix.engine == 'engine.exe' && '.exe' || '' }}"
+          cp "target/${{ matrix.rust }}/release/${{ matrix.engine }}" "dist/engine-${{ matrix.target }}${{ matrix.engine == 'engine.exe' && '.exe' || '' }}"
       - name: Upload assets
         uses: actions/upload-artifact@v6
         with:

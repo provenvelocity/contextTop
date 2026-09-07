@@ -37,13 +37,24 @@ and open the **contextTop** panel.
 ### Install a prebuilt package
 
 CI builds a platform-specific `.vsix` for each OS with the Rust engine **bundled inside**,
-so you can install and run without a source checkout:
+so you can install and run without a source checkout or any extra setup.
 
-1. Download the `.vsix` for your platform from the latest
-   [Release](https://github.com/provenvelocity/contextTop/releases) (or a CI run's
-   artifacts). Platforms: `darwin-arm64`, `darwin-x64`, `linux-x64`, `win32-x64`.
-2. Install it: `code --install-extension contexttop-<platform>.vsix`
-   (or Extensions view → `⋯` → *Install from VSIX…*).
+1. **Pick your platform:** `darwin-arm64` (Apple Silicon Mac), `darwin-x64` (Intel Mac),
+   `linux-x64` (Linux), or `win32-x64` (Windows).
+2. **Download the `.vsix`:**
+   - From a [Release](https://github.com/provenvelocity/contextTop/releases) — the
+     `contexttop-<platform>.vsix` is attached directly, or
+   - From a green [CI run](https://github.com/provenvelocity/contextTop/actions) — open the
+     run, download the `contexttop-<platform>-vsix` artifact, and unzip it (Actions wraps
+     artifacts in a `.zip`).
+3. **Install it:**
+   ```bash
+   code --install-extension contexttop-<platform>.vsix
+   ```
+   Or in VS Code: Extensions view → `⋯` → *Install from VSIX…*.
+4. **Run it:** reload VS Code, open the **contextTop** panel from the bottom Panel area
+   (beside Terminal), and use GitHub Copilot Chat as usual — the dashboard populates from
+   your Copilot activity. Requires **GitHub Copilot Chat** installed and signed in.
 
 See [`docs/TESTING.md`](docs/TESTING.md) for the full build, run, install, and release flow.
 
