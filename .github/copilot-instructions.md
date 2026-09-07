@@ -63,3 +63,19 @@ into a single "big picture" task and lose the specifics. Before I start:
 - Finish the whole request. Don't leave "TODO / next up" stubs — if I wrote it down,
   I do it in the same pass.
 - at the end of a session please confirm that all tasks are either completed or properly tracked in `## In Progress`. if not completed please ask to complete them if they are not clear or complete them if clear deliverable is stated. 
+
+## 5. Commits carry their TODO update
+
+Every commit and its TASKS.md update land together as **one unit** — never split the
+code change from its task record into separate commits.
+
+- **Attach the TODO to the commit.** The commit message states what was done, and the
+  **same commit** updates TASKS.md: move the finished `## In Progress` items to the top
+  of `## Completed` (check `[x]`, stamp today's date), and add any newly-completed work
+  as a Completed line.
+- **Include uncommitted TODO edits.** Any TASKS.md changes not yet committed are staged
+  and committed with the code they describe.
+- **Use `push.sh`.** `./push.sh "Short title — what changed"` does this automatically: it
+  records the message as a dated `## Completed` entry in TASKS.md, stages the code plus
+  that task update, commits them as one unit, and pushes. See also `scripts/release.sh`
+  for a version-bumping, CI-validating release.

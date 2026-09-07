@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-07 — chore: add push.sh (commit+TODO update+push as one unit) and TODO commit instruction
 - [x] 2026-09-06 — **Fix lifecycle: `request.reportLifecycle` (proposed/accepted/applied)** — Add the `ReportLifecycleRequest`/`LifecycleResponse` protocol types and an engine handler that registers `fix_proposed` on first ranking, validates adapter `fix_accepted`/`fix_applied` transitions (correct order; `removedSourceKeys` only on apply and within frozen `targetSourceKeys`; engine-owned kinds rejected; tool events require `operationId`), and acks with the new fix state. Adapter reports `fix_accepted` when the user acts on the Story card's *Manage tools…*. 6 new engine tests; `fix_verified` scoped as the remaining piece. Consistent with `docs/IPC.md#requestreportlifecycle`.
 - [x] 2026-09-06 — **Extension recommendations file** — `.vscode/extensions.json` lists the stack's recommended extensions and steers VS Code to disable unrelated stacks for this workspace (reversible; nothing uninstalled).
 
