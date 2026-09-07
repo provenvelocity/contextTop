@@ -56,7 +56,7 @@ jobs:
           cp "apps/vscode/contexttop-${{ matrix.target }}.vsix" "dist/"
           cp "target/release/${{ matrix.engine }}" "dist/engine-${{ matrix.target }}${{ matrix.engine == 'engine.exe' && '.exe' || '' }}"
       - name: Upload assets
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-${{ matrix.target }}
           path: dist/*
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all assets
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true

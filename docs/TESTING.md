@@ -127,12 +127,20 @@ The pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) has thr
    that builds the release engine, bundles it into the extension, runs `vsce package
    --target <platform>`, and uploads the `.vsix` **and** the engine binary as artifacts.
 
-**Cutting a release.** Push a `v*` tag; [`.github/workflows/release.yml`](../.github/workflows/release.yml)
-rebuilds every platform and creates a GitHub Release with all `.vsix` packages and engine
-binaries attached:
+**Cutting a release.** Run the release helper — it bumps the version in `Cargo.toml`
+and the extension manifest, runs the CI-parity checks, then commits, tags, and pushes.
+Pushing the `v*` tag triggers [`.github/workflows/release.yml`](../.github/workflows/release.yml),
+which rebuilds every platform and creates a GitHub Release with all `.vsix` packages and
+engine binaries attached:
 
 ```bash
-git tag -a v0.1.1 -m "contextTop v0.1.1"
+scripts/release.sh 0.1.3
+```
+
+Equivalent manual steps if you prefer:
+
+```bash
+git tag -a v0.1.3 -m "contextTop v0.1.3"
 git push origin main --follow-tags
 ```
 

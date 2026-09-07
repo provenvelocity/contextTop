@@ -79,13 +79,13 @@ jobs:
         working-directory: apps/vscode
         run: npx vsce package --target ${{ matrix.target }} -o contexttop-${{ matrix.target }}.vsix
       - name: Upload VSIX
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: contexttop-${{ matrix.target }}-vsix
           path: apps/vscode/contexttop-${{ matrix.target }}.vsix
           if-no-files-found: error
       - name: Upload engine binary
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: engine-${{ matrix.target }}
           path: target/release/${{ matrix.engine }}
