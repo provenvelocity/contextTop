@@ -68,21 +68,75 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  notes:
+    name: AI release notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Assemble changelog context
+        id: ctx
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          scripts/release-notes.sh "$TAG" > context.md
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Generate AI release notes (GitHub Models)
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          SYS='You are a release-notes editor for the contextTop VS Code extension. Given a structured changelog (Conventional-Commit groups and completed TASKS.md items) between two versions, write clear, user-facing GitHub release notes in Markdown. Open with a short highlight paragraph, then concise grouped bullets (Highlights, Features, Fixes, Docs, Internal as applicable). Be accurate and specific; never invent changes not present in the input. Keep it tight and skip empty sections.'
+          jq -Rs --arg sys "$SYS" --arg tag "${{ steps.ctx.outputs.tag }}" \
+            '{model:"openai/gpt-4o-mini",temperature:0.2,messages:[{role:"system",content:$sys},{role:"user",content:("Release " + $tag + ". Changelog input:\n\n" + .)}]}' \
+            context.md > req.json
+          code=$(curl -sS -o resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://models.github.ai/inference/chat/completions \
+            -d @req.json || echo 000)
+          if [ "$code" = "200" ] && jq -e '.choices[0].message.content' resp.json >/dev/null 2>&1; then
+            jq -r '.choices[0].message.content' resp.json > release-notes.md
+            echo "AI release notes generated."
+          else
+            echo "GitHub Models unavailable (HTTP $code) — using the deterministic changelog."
+          fi
+      - name: Ensure notes exist
+        run: |
+          if [ ! -s release-notes.md ]; then cp context.md release-notes.md; fi
+          echo "----- release notes -----"; cat release-notes.md
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ai-notes
+          path: release-notes.md
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: package
+    needs: [package, notes]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all assets
+      - name: Download platform assets
         uses: actions/download-artifact@v7
         with:
+          pattern: release-*
           path: dist
           merge-multiple: true
+      - name: Download release notes
+        uses: actions/download-artifact@v7
+        with:
+          name: ai-notes
+          path: notes
       - name: List assets
-        run: find dist -type f
+        run: |
+          find dist -type f
+          echo '----- notes -----'; cat notes/release-notes.md
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: notes/release-notes.md
           fail_on_unmatched_files: true

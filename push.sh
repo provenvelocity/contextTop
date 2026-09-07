@@ -153,8 +153,17 @@ if [[ "$do_release" -eq 1 ]]; then
       if gh release view "v${NEXT}" >/dev/null 2>&1; then
         echo "release v${NEXT} already exists; leaving it for CI to attach assets"
       else
-        gh release create "v${NEXT}" --title "v${NEXT}" --generate-notes
-        echo "created GitHub Release v${NEXT} (binaries attach when CI runs)"
+        # Seed the release body with the deterministic changelog; the Release
+        # workflow rewrites it with AI notes (GitHub Models) once a runner runs.
+        NOTES="$(mktemp)"
+        scripts/release-notes.sh "v${NEXT}" > "$NOTES" || true
+        if [[ -s "$NOTES" ]]; then
+          gh release create "v${NEXT}" --title "v${NEXT}" --notes-file "$NOTES"
+        else
+          gh release create "v${NEXT}" --title "v${NEXT}" --generate-notes
+        fi
+        rm -f "$NOTES"
+        echo "created GitHub Release v${NEXT} (AI notes + binaries land when CI runs)"
       fi
     else
       echo "gh not found: tag pushed; release.yml will publish when a runner is available"
