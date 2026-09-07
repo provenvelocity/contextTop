@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-07 — ci: skip CI on the release-bump commit to avoid a duplicate run alongside Release
 - [x] 2026-09-07 — feat: first testable release
 - [x] 2026-09-07 — feat: push.sh auto-cuts SemVer releases from Conventional Commits (0.x-aware); --release/--no-release flags
 - [x] 2026-09-07 — **README rewrite for quick use** — Rewrote the root README as a VS Code extension landing page (tagline, Features, Requirements, Install prebuilt/from-source, Quick start, Settings table, Commands table, Privacy, Documentation split, Contributing, License) focused on getting users running fast.
