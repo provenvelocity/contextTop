@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import { randomBytes } from 'crypto';
 
 const MAX_MESSAGE_BYTES = 1024 * 1024; // 1 MiB
@@ -48,8 +49,28 @@ export class EngineClient {
     await this._start();
   }
 
+  /**
+   * Locate the engine binary. A packaged extension bundles it under `bin/`; a dev checkout
+   * uses the Cargo `target/` build. First existing path wins.
+   */
+  private _resolveEnginePath(): string {
+    const exe = process.platform === 'win32' ? 'engine.exe' : 'engine';
+    const candidates = [
+      path.join(this.extensionPath, 'bin', exe),
+      path.join(this.extensionPath, '..', '..', 'target', 'release', exe),
+      path.join(this.extensionPath, '..', '..', 'target', 'debug', exe),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    // Fall back to the bundled path; spawn will emit a handled 'error' if it is missing.
+    return candidates[0];
+  }
+
   private async _start(): Promise<void> {
-    const enginePath = path.join(this.extensionPath, '..', '..', 'target', 'debug', 'engine');
+    const enginePath = this._resolveEnginePath();
     this.output.appendLine(`[${new Date().toISOString()}] Spawning engine: ${enginePath}`);
 
     this.child = cp.spawn(enginePath, [], {

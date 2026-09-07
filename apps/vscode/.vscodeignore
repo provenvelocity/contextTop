@@ -1,0 +1,8 @@
+# Source and build inputs — not needed in the packaged extension.
+src/**
+tsconfig.json
+**/*.map
+.vscodeignore
+.gitignore
+
+# Keep in the package: out/ (compiled JS), bin/ (engine binary), media/, package.json, README.

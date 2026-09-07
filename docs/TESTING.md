@@ -27,7 +27,9 @@ npm run compile
 ```
 
 The extension spawns `target/debug/engine` relative to the repo, so `cargo build` must
-run before launching.
+run before launching. A **packaged** build instead loads the engine bundled at
+`bin/engine` inside the extension (see [§6](#6-install-a-packaged-build)); the client
+tries `bin/`, then `target/release`, then `target/debug`.
 
 ## 2. Run (F5)
 
@@ -86,6 +88,53 @@ python scripts/check-docs.py
 ```
 
 These are the same steps enforced by [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+## 6. Install a packaged build
+
+CI produces a platform-specific `.vsix` with the engine **bundled inside** (`bin/engine`),
+so end users install and run without a source checkout.
+
+Get one from:
+
+- the latest [Release](https://github.com/provenvelocity/contextTop/releases), or
+- a green CI run's **artifacts** (`contexttop-<platform>-vsix`).
+
+Then install:
+
+```bash
+code --install-extension contexttop-<platform>.vsix
+# platforms: darwin-arm64 | darwin-x64 | linux-x64 | win32-x64
+```
+
+Or: Extensions view → `⋯` → *Install from VSIX…*. Open the **contextTop** panel from the
+bottom Panel area.
+
+To build a `.vsix` locally (host platform):
+
+```bash
+cargo build --release --bin engine
+mkdir -p apps/vscode/bin && cp target/release/engine apps/vscode/bin/engine
+cd apps/vscode && npm ci && npx vsce package --target darwin-arm64 -o contexttop.vsix
+```
+
+## 7. CI and releases
+
+The pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) has three stages:
+
+1. **`lint-test`** — `cargo fmt --check`, `clippy -D warnings`, `cargo test`.
+2. **`docs`** — `scripts/check-docs.py`.
+3. **`package`** — a matrix over `linux-x64`, `darwin-arm64`, `darwin-x64`, `win32-x64`
+   that builds the release engine, bundles it into the extension, runs `vsce package
+   --target <platform>`, and uploads the `.vsix` **and** the engine binary as artifacts.
+
+**Cutting a release.** Push a `v*` tag; [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+rebuilds every platform and creates a GitHub Release with all `.vsix` packages and engine
+binaries attached:
+
+```bash
+git tag -a v0.1.1 -m "contextTop v0.1.1"
+git push origin main --follow-tags
+```
 
 ## Troubleshooting
 

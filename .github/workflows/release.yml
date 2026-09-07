@@ -1,44 +1,15 @@
-name: CI
+name: Release
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ['v*']
 
 permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  lint-test:
-    name: Rust (fmt, clippy, test)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-
-  docs:
-    name: Docs (links + whitespace)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - run: python scripts/check-docs.py
-
   package:
     name: Package (${{ matrix.target }})
-    needs: [lint-test, docs]
     strategy:
       fail-fast: false
       matrix:
@@ -78,15 +49,34 @@ jobs:
       - name: Package VSIX
         working-directory: apps/vscode
         run: npx vsce package --target ${{ matrix.target }} -o contexttop-${{ matrix.target }}.vsix
-      - name: Upload VSIX
+      - name: Stage release assets
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "apps/vscode/contexttop-${{ matrix.target }}.vsix" "dist/"
+          cp "target/release/${{ matrix.engine }}" "dist/engine-${{ matrix.target }}${{ matrix.engine == 'engine.exe' && '.exe' || '' }}"
+      - name: Upload assets
         uses: actions/upload-artifact@v4
         with:
-          name: contexttop-${{ matrix.target }}-vsix
-          path: apps/vscode/contexttop-${{ matrix.target }}.vsix
+          name: release-${{ matrix.target }}
+          path: dist/*
           if-no-files-found: error
-      - name: Upload engine binary
-        uses: actions/upload-artifact@v4
+
+  release:
+    name: Publish GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all assets
+        uses: actions/download-artifact@v4
         with:
-          name: engine-${{ matrix.target }}
-          path: target/release/${{ matrix.engine }}
-          if-no-files-found: error
+          path: dist
+          merge-multiple: true
+      - name: List assets
+        run: find dist -type f
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

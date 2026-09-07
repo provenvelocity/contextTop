@@ -1,5 +1,7 @@
 # contextTop
 
+[![CI](https://github.com/provenvelocity/contextTop/actions/workflows/ci.yml/badge.svg)](https://github.com/provenvelocity/contextTop/actions/workflows/ci.yml)
+
 contextTop is an early-stage, local-first context observability project for GitHub
 Copilot in VS Code. It distinguishes locally visible candidate pressure from confirmed
 request context, estimates token pressure in real time, and proposes reversible fixes
@@ -31,6 +33,19 @@ cd apps/vscode && npm ci && npm run compile   # build the extension
 
 Then open the repo in VS Code and press **F5** to launch the Extension Development Host,
 and open the **contextTop** panel.
+
+### Install a prebuilt package
+
+CI builds a platform-specific `.vsix` for each OS with the Rust engine **bundled inside**,
+so you can install and run without a source checkout:
+
+1. Download the `.vsix` for your platform from the latest
+   [Release](https://github.com/provenvelocity/contextTop/releases) (or a CI run's
+   artifacts). Platforms: `darwin-arm64`, `darwin-x64`, `linux-x64`, `win32-x64`.
+2. Install it: `code --install-extension contexttop-<platform>.vsix`
+   (or Extensions view → `⋯` → *Install from VSIX…*).
+
+See [`docs/TESTING.md`](docs/TESTING.md) for the full build, run, install, and release flow.
 
 Continuous integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the
 same checks on every push and pull request:

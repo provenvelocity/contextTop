@@ -3,6 +3,7 @@ node_modules/
 dist/
 target/
 apps/vscode/out/
+apps/vscode/bin/
 .vscode-test/
 *.vsix
 *.db
