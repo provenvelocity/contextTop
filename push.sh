@@ -15,6 +15,12 @@ cd "$(dirname "$0")"
 MSG="${*:-}"
 RECORD_COMPLETED=1
 
+# No message and nothing changed? Stop before deriving a message from the todos.
+if [[ -z "$MSG" && -z "$(git status --porcelain)" ]]; then
+  echo "nothing to commit"
+  exit 0
+fi
+
 if [[ -z "$MSG" ]]; then
   # No message: derive one from the `## In Progress` TODO statements.
   RECORD_COMPLETED=0
