@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-07 — feat: push.sh auto-cuts SemVer releases from Conventional Commits (0.x-aware); --release/--no-release flags
 - [x] 2026-09-07 — **README rewrite for quick use** — Rewrote the root README as a VS Code extension landing page (tagline, Features, Requirements, Install prebuilt/from-source, Quick start, Settings table, Commands table, Privacy, Documentation split, Contributing, License) focused on getting users running fast.
 - [x] 2026-09-07 — **Move architectural docs to docs/arch** — `git mv` ARCHITECTURE, SIGNALS, IPC, METRICS, IMPLEMENTATION_PLAN into `docs/arch/`; rewrote all cross-doc links and updated `scripts/check-docs.py` to recurse (rglob).
 - [x] 2026-09-07 — **Deepen docs navigation** — Added `docs/README.md` and `docs/arch/README.md` index pages splitting product/usage docs from technical specs; kept product docs (PRODUCT, DASHBOARD, TOOL_STORY, TESTING) in `docs/`.
