@@ -1,6 +1,6 @@
 //! In-memory session key and `sourceKey` derivation. The engine HMAC-SHA-256s the
 //! adapter's `sourceIdentity` with a per-session key; only the lowercase-hex digest of the
-//! full 32-byte HMAC is retained. Frozen decision #1 in `docs/ARCHITECTURE.md`.
+//! full 32-byte HMAC is retained. Frozen decision #1 in `docs/arch/ARCHITECTURE.md`.
 
 use std::fmt::Write as _;
 

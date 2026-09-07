@@ -1,5 +1,5 @@
 //! Model-aware token estimation with a conservative fallback. v1 ships only the fallback
-//! plus a registry seam; model-specific tokenizers arrive later. See `docs/SIGNALS.md`
+//! plus a registry seam; model-specific tokenizers arrive later. See `docs/arch/SIGNALS.md`
 //! (Tokenizer strategy). Any fallback result is labeled `estimated` by the caller.
 
 /// Identifier reported for the conservative fallback tokenizer.

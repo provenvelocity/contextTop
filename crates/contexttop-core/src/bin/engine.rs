@@ -3,7 +3,7 @@
 //! Reads newline-delimited JSON from `stdin`, writes responses/events to `stdout`, and
 //! reserves `stderr` for diagnostics. This first increment implements the `request.hello`
 //! handshake and graceful shutdown; observation, timeline, and recommendation dispatch
-//! arrive in later increments. See `docs/IPC.md`.
+//! arrive in later increments. See `docs/arch/IPC.md`.
 
 use std::collections::BTreeMap;
 use std::io::{self, BufReader, Read, Write};

@@ -63,7 +63,7 @@ Ambient metrics are **candidate** pressure (locally visible, `estimated`) from D
 VS Code APIs: editor selection, open documents, instruction/prompt/agent files, and
 `vscode.lm.tools` (which includes MCP-registered tools). Per-request metrics — confirmed
 composition, model budget, and agent tokens used in the last turn — require the
-`@contexttop` participant or the opt-in Agent Debug Log; see [`SIGNALS.md`](SIGNALS.md).
+`@contexttop` participant or the opt-in Agent Debug Log; see [`SIGNALS.md`](arch/SIGNALS.md).
 
 ### Status bar
 

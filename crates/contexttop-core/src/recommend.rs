@@ -1,6 +1,6 @@
 //! Rank-only recommendation logic. The engine identifies context pressure and proposes
 //! reversible actions; it never applies them. There is no `applyFix` RPC. See
-//! `docs/PRODUCT.md` and `docs/IPC.md` (`response.recommendations`).
+//! `docs/PRODUCT.md` and `docs/arch/IPC.md` (`response.recommendations`).
 
 use crate::model::{Measurement, SourceKind};
 

@@ -32,7 +32,7 @@ user-extensible** (see [§4.2](#42-dashboard-architecture-and-extensibility)):
 ## 2. New metrics we can add
 
 All of these are **observed** from `main.jsonl` spans or the sidecar files unless marked
-otherwise. Confidence labels follow [`METRICS.md`](METRICS.md#metric-meaning).
+otherwise. Confidence labels follow [`METRICS.md`](arch/METRICS.md#metric-meaning).
 
 ### 2.1 Per-request (from `llm_request` spans)
 
@@ -123,7 +123,7 @@ The sidecars let us decompose it honestly:
   observed, not guessed.
 
 This turns the single `inputTokens` bar into a **stacked breakdown** matching the source
-palette in [`METRICS.md`](METRICS.md#source-categories).
+palette in [`METRICS.md`](arch/METRICS.md#source-categories).
 
 ### 3.3 How it is wired
 
@@ -136,12 +136,12 @@ palette in [`METRICS.md`](METRICS.md#source-categories).
    deliberately **not** ingested as ambient `instructions`/`tools` candidates — that
    would double-count against the observed `inputTokens` and the real ambient collectors,
    violating the candidate-vs-confirmed separation in
-   [`METRICS.md`](METRICS.md#metric-meaning).
+   [`METRICS.md`](arch/METRICS.md#metric-meaning).
 4. **Budget**: read `models.json` `capabilities.limits` for the active model
    (`max_prompt_tokens`, else `max_context_window_tokens`) and show input as a percentage
    of it — an observed budget, not a guessed window.
 5. **Privacy**: sidecar text is processing input only — tokenize then drop the buffer,
-   per the [storage/retention contract](METRICS.md#storage-and-retention). Never persist
+   per the [storage/retention contract](arch/METRICS.md#storage-and-retention). Never persist
    raw prompt or tool text.
 
 ---

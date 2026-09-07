@@ -231,7 +231,7 @@ The engine stores an append-only `LifecycleEvent`, updates the separate lifecycl
 projection, and re-emits the corresponding event to all subscribers with a `seq`.
 `fix_proposed` is created by the engine when it first returns a recommendation;
 `fix_verified` is created by the engine only after the comparison rules in
-[`PRODUCT.md`](PRODUCT.md#contexttop-fix) succeed. The adapter must not report either
+[`PRODUCT.md`](../PRODUCT.md#contexttop-fix) succeed. The adapter must not report either
 engine-owned transition.
 
 ```jsonc

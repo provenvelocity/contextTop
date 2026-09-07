@@ -26,9 +26,9 @@ almost entirely **extension/MCP tools that were never called** — dead weight p
 
 | Data point | Source | Spec reference |
 | --- | --- | --- |
-| Loaded tool inventory + per-tool schema cost | `vscode.lm.tools`, costed by serialized name + description + input schema | [`SIGNALS.md` — Tools / MCP collector](SIGNALS.md#implemented-ambient-collectors) |
-| MCP tools included in that cost | MCP-registered tools appear in `vscode.lm.tools` | [`SIGNALS.md` — Observed APIs](SIGNALS.md#observed--direct-vs-code-apis) |
-| Tools actually invoked this session | `tool_call` span names in the debug log | [`SIGNALS.md` — diagnostic data catalog](SIGNALS.md#experimental-diagnostic-logs-opt-in) |
+| Loaded tool inventory + per-tool schema cost | `vscode.lm.tools`, costed by serialized name + description + input schema | [`SIGNALS.md` — Tools / MCP collector](arch/SIGNALS.md#implemented-ambient-collectors) |
+| MCP tools included in that cost | MCP-registered tools appear in `vscode.lm.tools` | [`SIGNALS.md` — Observed APIs](arch/SIGNALS.md#observed--direct-vs-code-apis) |
+| Tools actually invoked this session | `tool_call` span names in the debug log | [`SIGNALS.md` — diagnostic data catalog](arch/SIGNALS.md#experimental-diagnostic-logs-opt-in) |
 
 Per `SIGNALS.md`, loaded-tool inventory is a **candidate** signal (`estimated`,
 `direct_api`): *"availability does not imply inclusion."* The Story card honours this — it
@@ -54,22 +54,22 @@ That fixes three rules for this feature:
 ## 4. How it measures cost (METRICS.md)
 
 - Tools are their own source category — **Tools** (purple), separate from **Tool results**
-  (gold) — in [`METRICS.md` — Source categories](METRICS.md#source-categories). Token
+  (gold) — in [`METRICS.md` — Source categories](arch/METRICS.md#source-categories). Token
   accounting *"keeps source size, tool schemas, and tool results in separate buckets."*
 - The `~Y% of last request` figure compares tool tokens to an **observed** request
-  `inputTokens`, consistent with [`METRICS.md` — Metric meaning](METRICS.md#metric-meaning):
+  `inputTokens`, consistent with [`METRICS.md` — Metric meaning](arch/METRICS.md#metric-meaning):
   tool cost is `estimated` (local tokenizer), request input is `observed` (diagnostic).
 - No provider budget percentage is claimed here beyond what
-  [`METRICS.md` — Token estimation](METRICS.md#token-estimation) allows.
+  [`METRICS.md` — Token estimation](arch/METRICS.md#token-estimation) allows.
 
 ## 5. How it maps to the engine recommendation path (IPC.md + ARCHITECTURE.md)
 
 The engine is the ranking authority; the adapter renders and routes
-([`ARCHITECTURE.md`](ARCHITECTURE.md#rust-engine-responsibilities)). The canonical
+([`ARCHITECTURE.md`](arch/ARCHITECTURE.md#rust-engine-responsibilities)). The canonical
 recommendation contract already covers this exact action:
 
-- [`IPC.md` — `request.getRecommendations`](IPC.md#requestgetrecommendations) and
-  [`response.recommendations`](IPC.md#responserecommendations) define
+- [`IPC.md` — `request.getRecommendations`](arch/IPC.md#requestgetrecommendations) and
+  [`response.recommendations`](arch/IPC.md#responserecommendations) define
   `actionKind: "unselect_tools"` with `execution: "guided"`,
   `estimatedTokensSavedMin/Max`, `measurement: "estimated"`, and a frozen
   `targetSourceKeys` scope.
@@ -78,7 +78,7 @@ recommendation contract already covers this exact action:
   `fix_proposed`/`fix_verified`.
 
 **Current implementation.** The Story card renders the engine-ranked recommendation: the
-adapter calls [`request.getRecommendations`](IPC.md#requestgetrecommendations), takes the
+adapter calls [`request.getRecommendations`](arch/IPC.md#requestgetrecommendations), takes the
 `unselect_tools` item, and shows its engine-computed `estimatedTokensSaved` range,
 `fixId`, and `execution: guided` alongside the used/unused tool breakdown. The narrative
 (used vs. unused, per-tool cost) is still computed adapter-side from
@@ -86,7 +86,7 @@ adapter calls [`request.getRecommendations`](IPC.md#requestgetrecommendations), 
 (`targetSourceKeys`) now come from the engine, and the Tools rule is correctly classified
 **Guided** (no supported API disables tools).
 
-**Lifecycle.** The engine now handles [`request.reportLifecycle`](IPC.md#requestreportlifecycle):
+**Lifecycle.** The engine now handles [`request.reportLifecycle`](arch/IPC.md#requestreportlifecycle):
 it registers `fix_proposed` when a `fixId` is first ranked, and validates the adapter's
 `fix_accepted` and `fix_applied` transitions (correct order; `removedSourceKeys` only on
 apply and only within the frozen `targetSourceKeys` scope; engine-owned kinds rejected).
@@ -101,12 +101,12 @@ The ambition — *turn tools off when you don't need them and on when you do, pe
 maybe with AI* — is bounded by the platform and the honesty contract:
 
 - **No programmatic per-call toggle.** `vscode.lm.tools` is read-only
-  ([`SIGNALS.md`](SIGNALS.md#observed--direct-vs-code-apis)); there is no API to
+  ([`SIGNALS.md`](arch/SIGNALS.md#observed--direct-vs-code-apis)); there is no API to
   enable/disable another extension's tool for standard Copilot chat. This is why the fix
   is **Guided**, not **Executable**, in `PRODUCT.md`.
 - **Standard-chat internals are `unknown`.** contextTop cannot see or edit Copilot's
   request assembly for non-participant chat
-  ([`SIGNALS.md` — Not detectable](SIGNALS.md#not-detectable--recorded-as-unknown)), and
+  ([`SIGNALS.md` — Not detectable](arch/SIGNALS.md#not-detectable--recorded-as-unknown)), and
   it *"must not claim it can inject arbitrary messages into the built-in Copilot stream"*
   ([`PRODUCT.md`](PRODUCT.md#contexttop-fix)). Copilot already reduces tool bloat
   server-side via *virtual tools* grouping (observed as `debugName: summarizeVirtualTools`).
@@ -114,7 +114,7 @@ maybe with AI* — is bounded by the platform and the honesty contract:
   to the Tools picker / tool sets (a persisted change, not per-call).
 - **AI-assisted (future, recommend-only):** for a prompt routed through `@contexttop`, an
   LLM could propose a minimal tool subset from the visible tool list. Per
-  [`SIGNALS.md`](SIGNALS.md#observed--direct-vs-code-apis) the participant sees only its
+  [`SIGNALS.md`](arch/SIGNALS.md#observed--direct-vs-code-apis) the participant sees only its
   own request's prompt/tools, and per `PRODUCT.md` the output stays a **recommendation** —
   the user or a tool set applies it. contextTop never silently mutates Copilot state.
 

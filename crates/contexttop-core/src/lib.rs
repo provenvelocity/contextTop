@@ -1,6 +1,6 @@
 //! Context accounting primitives shared by VS Code and future native clients.
 //!
-//! The domain model follows `docs/METRICS.md`: candidate pressure is a gauge, request
+//! The domain model follows `docs/arch/METRICS.md`: candidate pressure is a gauge, request
 //! source composition is immutable, and measurement/inclusion/coverage are independent
 //! axes. The prototype additive event model has been removed.
 

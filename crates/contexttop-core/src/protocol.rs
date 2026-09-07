@@ -1,5 +1,5 @@
 //! v1 IPC envelope and message types. This module is the Rust half of the contract in
-//! `docs/IPC.md`; the TypeScript bridge must match the same wire shapes.
+//! `docs/arch/IPC.md`; the TypeScript bridge must match the same wire shapes.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -56,7 +56,7 @@ pub struct HelloResponse {
     pub capabilities: Vec<String>,
 }
 
-/// Wire error codes from `docs/IPC.md` (Errors).
+/// Wire error codes from `docs/arch/IPC.md` (Errors).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     Version,

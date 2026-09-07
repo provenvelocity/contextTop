@@ -163,5 +163,5 @@ git push origin main --follow-tags
 Raw prompts, source text, paths, and terminal content are **never persisted**. The
 adapter sends bounded, ANSI-stripped buffers only when local content processing is
 enabled; the engine tokenizes then drops them. See
-[`SIGNALS.md`](SIGNALS.md#opt-in-capture-levels) and
-[`METRICS.md`](METRICS.md#storage-and-retention).
+[`SIGNALS.md`](arch/SIGNALS.md#opt-in-capture-levels) and
+[`METRICS.md`](arch/METRICS.md#storage-and-retention).

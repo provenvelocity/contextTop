@@ -1,12 +1,12 @@
 //! Core domain model. Three independent axes — Measurement × Inclusion × Coverage — plus
-//! the candidate pressure gauge. See `docs/METRICS.md`. `partial` is coverage only; it is
+//! the candidate pressure gauge. See `docs/arch/METRICS.md`. `partial` is coverage only; it is
 //! never a measurement.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Source categories carried on the wire (`docs/METRICS.md` source categories).
+/// Source categories carried on the wire (`docs/arch/METRICS.md` source categories).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceKind {
