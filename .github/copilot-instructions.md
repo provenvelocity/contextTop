@@ -77,5 +77,6 @@ code change from its task record into separate commits.
   and committed with the code they describe.
 - **Use `push.sh`.** `./push.sh "Short title — what changed"` does this automatically: it
   records the message as a dated `## Completed` entry in TASKS.md, stages the code plus
-  that task update, commits them as one unit, and pushes. See also `scripts/release.sh`
-  for a version-bumping, CI-validating release.
+  that task update, commits them as one unit, and pushes. Run `./push.sh` with **no
+  argument** to build the commit message from the current `## In Progress` TODO statements
+  instead. See also `scripts/release.sh` for a version-bumping, CI-validating release.
