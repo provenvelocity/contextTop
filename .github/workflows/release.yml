@@ -28,7 +28,7 @@ jobs:
             engine: engine.exe
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build engine (release)
@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p apps/vscode/bin
           cp "target/release/${{ matrix.engine }}" "apps/vscode/bin/${{ matrix.engine }}"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -56,7 +56,7 @@ jobs:
           cp "apps/vscode/contexttop-${{ matrix.target }}.vsix" "dist/"
           cp "target/release/${{ matrix.engine }}" "dist/engine-${{ matrix.target }}${{ matrix.engine == 'engine.exe' && '.exe' || '' }}"
       - name: Upload assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-${{ matrix.target }}
           path: dist/*
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: dist
           merge-multiple: true
