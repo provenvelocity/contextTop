@@ -7,3 +7,4 @@ target/
 *.db
 *.db-*
 *.log
+/apps/vscode/node_modules/

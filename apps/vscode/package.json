@@ -1,0 +1,56 @@
+{
+  "name": "contexttop-vscode-probe",
+  "displayName": "contextTop Probe",
+  "description": "Phase 0 capability probe for contextTop",
+  "version": "0.1.0",
+  "publisher": "contexttop",
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished", "onChatParticipant:contexttop"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "contextTop",
+      "properties": {
+        "contexttop.enginePath": {
+          "type": "string",
+          "default": "contexttop-engine",
+          "description": "Path to the contextTop Rust engine executable."
+        }
+      }
+    },
+    "commands": [
+      { "command": "contexttop.probe", "title": "contextTop: Record Capability Probe" },
+      { "command": "contexttop.open", "title": "contextTop: Open Fix Panel" }
+    ],
+    "viewsContainers": {
+      "panel": [
+        { "id": "contexttop.container", "title": "contextTop Fix", "icon": "media/contexttop.svg" }
+      ]
+    },
+    "views": {
+      "contexttop.container": [
+        { "id": "contexttop.fix", "name": "Context timeline", "type": "webview" }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "contexttop",
+        "name": "contexttop",
+        "description": "Context preflight probe",
+        "commands": [
+          { "name": "fix", "description": "Review current context pressure and recommended fixes" }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "tsc -p ./ --noEmit"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.95.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

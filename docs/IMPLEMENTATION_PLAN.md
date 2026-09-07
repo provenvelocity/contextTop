@@ -1,5 +1,35 @@
 # Implementation plan
 
+## Execution status
+
+Phase 0 is implemented as an initial capability contract and probe slice. The
+written matrix is in `docs/CAPABILITY_MATRIX.md`, with a redacted event fixture
+in `docs/fixtures/sample-events.jsonl`. The first Phase 1 Rust contracts are
+also executable: protocol types, five-second aggregation, redaction, token
+estimation, and JSONL event storage live under `crates/`.
+
+The authenticated stdio bridge is implemented in the Rust engine binary and
+the VS Code adapter. It performs a version check and secret-storage-backed
+handshake token exchange, emits recomputed buckets, and reports protocol
+errors. The adapter compiles with the nvm-managed Node/npm installation.
+
+The fixture-driven VS Code panel, status bar, and local event capture wiring
+are now implemented. The panel renders the latest five-second buckets as a
+source-stacked timeline, while the adapter reports estimated editor and
+selection counts without sending raw content. Deterministic fix
+recommendations are ranked in Rust and displayed with evidence, savings, scope,
+and reversibility. Preview/apply controls now use the versioned IPC protocol;
+preview is acknowledged and apply reports advisory-only behavior when no
+supported mutation API exists. Recommendations do not silently modify
+workspaces or Copilot sessions.
+
+The first Phase 2 workflow slice is implemented: `@contexttop /fix` now
+streams a preflight summary from the latest observed bucket and recommendations,
+including source totals, confidence, expected savings, and the unknown
+provider-side boundary. Non-`/fix` participant requests remain observational.
+The remaining Phase 2 work is handoff-summary generation, optional diagnostics
+gating, and tool inventory/result accounting.
+
 ## Phase 0 — capability spike
 
 **Goal:** establish the honest observation contract before building product claims.

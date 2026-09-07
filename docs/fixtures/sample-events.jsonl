@@ -1,0 +1,3 @@
+{"timestamp_ms":1757155200123,"session_id":"demo-session","request_id":"request-1","event_kind":"source_changed","source_kind":"selection","token_count":420,"confidence":"estimated","source_fingerprint":"sha256:selection-demo","metadata_redacted":{"path":"[REDACTED_PATH]"}}
+{"timestamp_ms":1757155200456,"session_id":"demo-session","request_id":"request-1","event_kind":"request_sent","source_kind":null,"token_count":null,"confidence":"unknown","source_fingerprint":null,"metadata_redacted":{"provider":"opaque"}}
+{"timestamp_ms":1757155205010,"session_id":"demo-session","request_id":"request-1","event_kind":"response_started","source_kind":null,"token_count":null,"confidence":"observed","source_fingerprint":null,"metadata_redacted":{}}
