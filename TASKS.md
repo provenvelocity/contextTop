@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-08 — perf(diagnostics): stop the over-time resource leak — throttle Copilot log directory scans to 5s (cost grew with session count), read only appended bytes each 1s tick, clear the sidecar cache on session switch, and skip webview redraws while the panel is hidden
 - [x] 2026-09-08 — feat(dashboard): color-code the diagnostics & agent-debug-log toggles (red dot = disabled, green dot = enabled)
 - [x] 2026-09-08 — docs: add Mermaid visuals of the system running (README how-it-works + dashboard map; DASHBOARD sequence) and a docs/media drop point for screenshots
 - [x] 2026-09-07 — ci: quote if-expressions in ci.yml (colon in 'release: v' broke YAML parsing, disabling all CI runs)

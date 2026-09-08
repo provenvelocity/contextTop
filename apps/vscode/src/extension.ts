@@ -1772,7 +1772,7 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   });
 
   // Keep the timeline scrolling even when no new events arrive.
-  setInterval(function () { if (series().length >= 2) draw(); }, 1000);
+  setInterval(function () { if (!document.hidden && series().length >= 2) draw(); }, 1000);
 
   resize();
 })();

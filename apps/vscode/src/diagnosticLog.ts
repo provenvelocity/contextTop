@@ -74,6 +74,9 @@ export class DiagnosticLogTailer {
   private modelLimits = new Map<string, { contextWindowTokens?: number; promptBudgetTokens?: number }>();
   private modelLimitsDir?: string;
   private analytics = new CopilotAnalyticsAccumulator();
+  /** Poll tick counter; expensive directory scans run only every DISCOVERY_EVERY ticks. */
+  private tickCount = 0;
+  private static readonly DISCOVERY_EVERY = 5;
 
   constructor(
     private engine: EngineClient,
@@ -93,12 +96,11 @@ export class DiagnosticLogTailer {
   }
 
   start(): void {
-    this.output.appendLine(`[diag] tailing ${this.hooksLog}`);
-    this.output.appendLine(`[diag] tailing ${this.chatLog}`);
-    this.output.appendLine(`[diag] debug-logs dir: ${this.debugLogsDir}`);
+    this.output.appendLine(`[diag] tailing Copilot logs; debug-logs: ${this.debugLogsDir}`);
     // Start at end-of-file so we only report activity from now on.
     this.offsets.set(this.hooksLog, this.fileSize(this.hooksLog));
     this.offsets.set(this.chatLog, this.fileSize(this.chatLog));
+    this.refreshActiveMainLog();
     this.poll();
     this.timer = setInterval(() => this.poll(), 1000);
   }
@@ -119,29 +121,41 @@ export class DiagnosticLogTailer {
   }
 
   private poll(): void {
+    // Cheap every second: read only the bytes appended to the already-open files.
     this.readAppended(this.hooksLog, (line) => this.parseHooksLine(line));
     this.readAppended(this.chatLog, (line) => this.parseChatLine(line));
-    this.pollDebugMainLog();
-    this.discoverOtlp();
+    if (this.activeMainLog) {
+      this.readAppended(this.activeMainLog, (line) => this.parseMainSpan(line));
+    }
+    // Directory scans cost O(number of Copilot sessions); throttle them so a long-lived
+    // window doesn't spend growing CPU/IO every second as sessions accumulate.
+    if (this.tickCount % DiagnosticLogTailer.DISCOVERY_EVERY === 0) {
+      this.refreshActiveMainLog();
+      this.discoverOtlp();
+    }
+    this.tickCount++;
   }
 
-  /** Tail the newest debug-logs session's `main.jsonl` for real per-request token usage. */
-  private pollDebugMainLog(): void {
+  /** Find the newest session's `main.jsonl` and switch tailing to it if it changed. */
+  private refreshActiveMainLog(): void {
     const main = this.newestMainLog();
-    if (!main) {
+    if (!main || main === this.activeMainLog) {
       return;
     }
-    if (main !== this.activeMainLog) {
-      // A new chat session started. Backfill its bounded, metadata-only statistics,
-      // then continue tailing from EOF. Raw messages/tool payloads are never retained.
-      this.activeMainLog = main;
-      this.activeSessionDir = path.dirname(main);
-      this.analytics.reset();
-      this.offsets.set(main, 0);
-      this.carry.set(main, '');
-      this.output.appendLine(`[diag] tailing session log ${main}`);
+    // A new chat session became newest. Backfill its bounded, metadata-only statistics
+    // from the start, then tail. Raw messages/tool payloads are never retained.
+    const previous = this.activeMainLog;
+    this.activeMainLog = main;
+    this.activeSessionDir = path.dirname(main);
+    this.analytics.reset();
+    this.sidecarTokenCache.clear();
+    this.offsets.set(main, 0);
+    this.carry.set(main, '');
+    if (previous) {
+      this.offsets.delete(previous);
+      this.carry.delete(previous);
     }
-    this.readAppended(main, (line) => this.parseMainSpan(line));
+    this.output.appendLine(`[diag] tailing session log ${main}`);
   }
 
   /** Newest session folder's main.jsonl, or undefined. */
@@ -191,9 +205,6 @@ export class DiagnosticLogTailer {
     }
     const model = typeof a.model === 'string' ? a.model : 'model';
     const latencyMs = typeof span.dur === 'number' ? span.dur : undefined;
-    this.output.appendLine(
-      `[diag] llm_request ${model}: input=${input} output=${a.outputTokens ?? '?'} cached=${a.cachedTokens ?? '?'} max=${a.maxTokens ?? '?'} dur=${latencyMs ?? '?'}ms`
-    );
 
     // Sidecar decomposition: attribute the opaque inputTokens to system prompt, tool
     // schemas, and user prompt using the files the span references. Buffers are read,
