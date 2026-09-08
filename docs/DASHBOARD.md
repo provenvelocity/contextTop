@@ -11,6 +11,46 @@ This document captures three things the current dashboard is missing:
 Everything below is grounded in what the real Copilot debug logs actually expose. No
 guessed provider internals.
 
+## The system, running
+
+What happens on each Copilot request, end to end:
+
+```mermaid
+sequenceDiagram
+  actor U as You
+  participant C as Copilot Chat
+  participant L as Debug logs
+  participant T as Tailer
+  participant E as Rust engine
+  participant D as Dashboard
+  U->>C: Send a prompt or run an agent task
+  C->>L: Write llm_request span + system/tools sidecars
+  T->>L: Tail the newest session
+  T->>E: recordRequestSnapshot(inputTokens, ttft, cacheHit)
+  E->>D: metrics + request breakdown + tool fix
+  D-->>U: Chart moves; Story flags unused tools
+```
+
+The panel renders as a top-to-bottom stack of cards (order and visibility are set by the
+`contextTop.dashboardLayout` setting):
+
+```mermaid
+flowchart TB
+  T["Toolbar — chart mode · metric · time window"]
+  S["Story — tools loaded, the unused ones, tokens to reclaim"]
+  R["Latest request — input · cache-hit% · TTFT · latency · model"]
+  B["Breakdown bar — system prompt · tools · prompt · other"]
+  G["Gauges — peak · rate · tools · instructions · files · terminals"]
+  C["Chart — per-source lines, or one chosen metric over time"]
+  L["Sources table — top sources by tokens"]
+  A["Analytics — turn duration · requests/turn · discovery counts"]
+  T --> S --> R --> B --> G --> C --> L --> A
+```
+
+> **Screenshots:** drop real captures of the running panel in `docs/media/` and embed them
+> here with Markdown image syntax (pointing at `media/<file>.png`) once you have a
+> representative session to show.
+
 ---
 
 ## 1. Current dashboard: what it is today

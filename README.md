@@ -23,6 +23,29 @@ and raw prompts or source text are never stored or sent anywhere.
 - **Honest labels** — every number is tagged Observed / Estimated and Confirmed /
   Candidate, so visible material is never passed off as confirmed request context.
 
+## How it works
+
+contextTop watches GitHub Copilot's own local activity, measures it in a Rust engine, and
+streams the result into a VS Code panel — nothing leaves your machine.
+
+```mermaid
+flowchart LR
+  CC["GitHub Copilot Chat"]
+  LOG[("Copilot debug logs<br/>main.jsonl + sidecars")]
+  subgraph EXT["contextTop extension"]
+    COL["Ambient collectors<br/>files · tools · instructions · selection"]
+    TAIL["Diagnostic log tailer"]
+    DASH["Webview dashboard"]
+  end
+  ENG["Rust engine<br/>measure · label · rank"]
+  CC -->|"writes OTLP spans"| LOG
+  LOG -->|"tail per request"| TAIL
+  COL -->|"ingest candidates"| ENG
+  TAIL -->|"request metrics"| ENG
+  ENG -->|"snapshots · gauges · fixes"| DASH
+  DASH -->|"manage tools · accept fix"| ENG
+```
+
 ## Requirements
 
 - **VS Code 1.96+**
@@ -65,6 +88,28 @@ press **F5**.
    - The **breakdown** bar shows where your tokens actually went.
 
 There is nothing to configure to get started.
+
+## What you see
+
+The panel is a stack of cards, top to bottom — the Story and Latest request cards answer
+"what is costing me and what can I cut?" at a glance.
+
+```mermaid
+flowchart TB
+  T["Toolbar — chart mode · metric · time window"]
+  S["Story — tools loaded, the unused ones, tokens to reclaim"]
+  R["Latest request — input · cache-hit% · TTFT · latency · model"]
+  B["Breakdown bar — system prompt · tools · prompt · other"]
+  G["Gauges — peak · rate · tools · instructions · files · terminals"]
+  C["Chart — per-source lines, or one chosen metric over time"]
+  L["Sources table — top sources by tokens"]
+  A["Analytics — turn duration · requests/turn · discovery counts"]
+  T --> S --> R --> B --> G --> C --> L --> A
+```
+
+> Want real screenshots here? Capture the panel from your installed build and drop the
+> images in `docs/media/`, then reference them in this section — see
+> [`docs/DASHBOARD.md`](docs/DASHBOARD.md) for what each card shows.
 
 ## Extension settings
 

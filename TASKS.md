@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-08 — docs: add Mermaid visuals of the system running (README how-it-works + dashboard map; DASHBOARD sequence) and a docs/media drop point for screenshots
 - [x] 2026-09-07 — ci: quote if-expressions in ci.yml (colon in 'release: v' broke YAML parsing, disabling all CI runs)
 - [x] 2026-09-07 — fix: remove JSONC comments from .vscode/extensions.json for strict-JSON validators
 - [x] 2026-09-07 — ci: auto-generate AI release notes from commits + TASKS.md between tags (GitHub Models, zero-secret, deterministic fallback)
