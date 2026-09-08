@@ -8,6 +8,7 @@
 
 ## Completed
 
+- [x] 2026-09-07 — fix: remove JSONC comments from .vscode/extensions.json for strict-JSON validators
 - [x] 2026-09-07 — ci: auto-generate AI release notes from commits + TASKS.md between tags (GitHub Models, zero-secret, deterministic fallback)
 - [x] 2026-09-07 — ci: skip CI on the release-bump commit to avoid a duplicate run alongside Release
 - [x] 2026-09-07 — feat: first testable release

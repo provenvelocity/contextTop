@@ -1,6 +1,4 @@
 {
-  // Extensions this workspace actually uses: Rust core (cargo) + a TypeScript/Node
-  // VS Code extension (tsc) + Markdown docs. rust-analyzer is required for the core.
   "recommendations": [
     "rust-lang.rust-analyzer",
     "esbenp.prettier-vscode",
@@ -9,8 +7,6 @@
     "redhat.vscode-yaml",
     "streetsidesoftware.code-spell-checker"
   ],
-  // Unrelated language/platform stacks — not used anywhere in this repo. VS Code will
-  // offer to disable these for this workspace. Reversible; nothing is uninstalled.
   "unwantedRecommendations": [
     "dart-code.dart-code",
     "dart-code.flutter",
