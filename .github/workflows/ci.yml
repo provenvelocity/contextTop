@@ -17,7 +17,7 @@ jobs:
     name: Rust (fmt, clippy, test)
     # The `release:` version-bump commit is validated locally by release.sh and
     # packaged by release.yml on its tag — don't re-run the whole CI on it.
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release: v') }}
+    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release: v') }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -31,7 +31,7 @@ jobs:
 
   docs:
     name: Docs (links + whitespace)
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release: v') }}
+    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release: v') }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
