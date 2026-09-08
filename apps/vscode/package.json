@@ -2,7 +2,7 @@
   "name": "contexttop-vscode",
   "displayName": "contextTop",
   "description": "Live GitHub Copilot context observability and fixes.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "provenvelocity",
   "engines": {
     "vscode": "^1.96.0"
