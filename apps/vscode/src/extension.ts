@@ -772,6 +772,11 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
   .toolbar .spacer { flex: 1 1 auto; }
   .wsel { display: inline-flex; gap: 2px; }
   .wsel button.active { background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); border-color: transparent; }
+  /* Diagnostics / Agent Debug Log toggles: red dot = disabled, green dot = enabled. */
+  .toolbar button.statebtn { position: relative; padding-left: 18px; color: var(--vscode-charts-red, #e51400); border-color: var(--vscode-charts-red, #e51400); }
+  .toolbar button.statebtn::before { content: ''; position: absolute; left: 7px; top: 50%; margin-top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--vscode-charts-red, #e51400); }
+  .toolbar button.statebtn.active { color: var(--vscode-charts-green, #2ea043); border-color: var(--vscode-charts-green, #2ea043); background: rgba(46,160,67,0.14); }
+  .toolbar button.statebtn.active::before { background: var(--vscode-charts-green, #2ea043); }
   .axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--vscode-descriptionForeground); flex: 0 0 auto; padding-top: 2px; }
   .reqstrip { display: none; flex-wrap: wrap; gap: 16px; align-items: baseline; flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--vscode-widget-border); border-radius: 5px; }
   .reqstrip.on { display: flex; }
@@ -882,8 +887,8 @@ class ContextTopFixProvider implements vscode.WebviewViewProvider {
       <button data-min="60">1h</button>
     </span>
     <span class="spacer"></span>
-    <button id="btnDiag">Enable diagnostic logs</button>
-    <button id="btnOtlp">Enable Copilot Agent Debug Log</button>
+    <button id="btnDiag" class="statebtn">Enable diagnostic logs</button>
+    <button id="btnOtlp" class="statebtn">Enable Copilot Agent Debug Log</button>
   </div>
 
   <div class="gauges" data-card="gauges">
